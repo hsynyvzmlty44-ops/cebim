@@ -21,12 +21,12 @@ h1{font-size:20px;margin:4px 0 10px}
 .neg{color:var(--rd)}.pos{color:var(--gr)}
 .tabs{display:flex;gap:6px;margin-bottom:10px}
 .tabs button,.nav button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
-.tabs button{flex:1}.tabs .on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.tabs button{flex:1;padding:8px 2px;font-size:13px}.tabs .on{background:var(--ac);color:#fff;border-color:var(--ac)}
 .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.nav b{font-size:16px}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .dh{font-size:11px;color:var(--mu);text-align:center}
 .cell{background:var(--card);border:1px solid var(--bd);border-radius:8px;min-height:54px;padding:3px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;overflow:hidden}
-.cell.off{opacity:.3;cursor:default}.cell.sel{outline:2px solid var(--ac)}
+.cell.off{opacity:.3;cursor:default}.cell.sel{outline:2px solid var(--ac)}.cell.past{opacity:.55}.cell.today{border:2px solid var(--gr)}.cell.today .n span:first-child{font-weight:700;color:var(--gr)}tr.past td{opacity:.55}tr.today td{font-weight:700}tr.today td:first-child{color:var(--gr)}
 .cell .n{font-size:11px;color:var(--mu);display:flex;justify-content:space-between}
 .cell .b{font-size:11px;font-weight:600;text-align:right}
 .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-left:2px}
@@ -48,7 +48,9 @@ input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px
 </style></head><body><div id="app">
 <h1>💸 Cebimdeki Para</h1>
 <div class="cards" id="cards"></div>
-<div class="tabs"><button data-v="cal" class="on">Takvim</button><button data-v="day">Günlük</button><button data-v="debt">Borçlar</button><button data-v="add">Ekle</button></div>
+<div id="bn"></div>
+<div class="panel" style="margin-bottom:10px"><b>Gerçek bakiye</b><div style="display:flex;gap:8px;margin-top:6px"><input id="rb" type="number" inputmode="decimal" placeholder="Şu an cebindeki para (₺)"><button class="btn" id="rbtn">Eşitle</button></div><div class="note" id="rbm" style="margin-top:6px">Fark, kayıt dışı harcama olarak bugüne işlenir.</div></div>
+<div class="tabs"><button data-v="cal" class="on">Takvim</button><button data-v="day">Günlük</button><button data-v="debt">Borçlar</button><button data-v="rep">Rapor</button><button data-v="add">Ekle</button></div>
 <div class="nav" id="nav"></div>
 <div id="view"></div><div id="detail"></div>
 <div class="panel" style="margin-top:10px"><label style="margin:0 0 3px">Başlangıç bakiyesi (12 Ekim 2026, cebindeki para)</label><input id="st" type="number" inputmode="numeric"></div>
@@ -76,7 +78,7 @@ const dl=d=>{const[y,m,dd]=d.split('-');return +dd+' '+MN[m-1]};
 const CG=['Burs','Özel ders','Aile desteği','Diğer gelir'],CX=['KYK','Yemek','Ulaşım','Fatura','Borç/Kart','Eğitim/Ehliyet','Sosyal/Sevgili','Seyahat','Diğer gider'];
 const guess=i=>i.c||(i.a>0?(/abi|aile/i.test(i.t)?'Aile desteği':/burs/i.test(i.t)?'Burs':/ders/i.test(i.t)?'Özel ders':'Diğer gelir'):/kyk/i.test(i.t)?'KYK':/sevgili/i.test(i.t)?'Sosyal/Sevgili':/yemek|yiyecek/i.test(i.t)?'Yemek':/ulaşım/i.test(i.t)?'Ulaşım':/telefon/i.test(i.t)?'Fatura':/kart|avans|borç/i.test(i.t)?'Borç/Kart':/ehliyet|sınav/i.test(i.t)?'Eğitim/Ehliyet':/uçak/i.test(i.t)?'Seyahat':'Diğer gider');
 function build(){byd={};bal={};st.items.forEach(i=>{if(i.d>=S&&i.d<=E)(byd[i.d]=byd[i.d]||[]).push(i)});let b=+st.start||0;for(let d=S;d<=E;d=nx(d)){(byd[d]||[]).forEach(i=>b+=i.a);bal[d]=b}}
-function cards(){let t=new Date().toISOString().slice(0,10);if(t<S)t=S;if(t>E)t=E;let mn=Infinity,md='';for(const d in bal)if(bal[d]<mn){mn=bal[d];md=d}
+function cards(){let t=tdy();let mn=Infinity,md='';for(const d in bal)if(bal[d]<mn){mn=bal[d];md=d}
 const c=(l,v,s)=>`<div class="c"><small>${l}</small><b class="${v<0?'neg':''}">${f(v)} ₺</b>${s?`<small>${s}</small>`:''}</div>`;
 document.getElementById('cards').innerHTML=c('Bugün',bal[t])+c('En düşük',mn,dl(md))+c('Eylül sonu',bal[E])}
 function nav(){const[y,m]=MS[mi].split('-');document.getElementById('nav').innerHTML=view==='add'||view==='debt'?'':`<button id="pv">‹</button><b>${MN[m-1]} ${y}</b><button id="nxt">›</button>`;
@@ -85,12 +87,12 @@ function cal(){const[y,m]=MS[mi].split('-').map(Number),dow=(new Date(Date.UTC(y
 let h='<div class="grid">'+['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map(x=>`<div class="dh">${x}</div>`).join('')+'<div></div>'.repeat(dow);
 for(let i=1;i<=n;i++){const d=MS[mi]+'-'+p2(i),on=d>=S&&d<=E;if(!on){h+=`<div class="cell off"><div class="n">${i}</div></div>`;continue}
 const its=byd[d]||[],inc=its.some(x=>x.a>0),ex=its.some(x=>x.a<0),b=bal[d];
-h+=`<div class="cell${b<0?' low':''}${sel===d?' sel':''}" data-d="${d}"><div class="n"><span>${i}</span><span>${inc?'<i class="dot" style="background:var(--gr)"></i>':''}${ex?'<i class="dot" style="background:var(--rd)"></i>':''}</span></div><div class="b ${b<0?'neg':''}">${k(b)}</div></div>`}
+h+=`<div class="cell${b<0?' low':''}${sel===d?' sel':''}${d===tdy()?' today':''}${d<tdy()?' past':''}" data-d="${d}"><div class="n"><span>${i}</span><span>${inc?'<i class="dot" style="background:var(--gr)"></i>':''}${ex?'<i class="dot" style="background:var(--rd)"></i>':''}</span></div><div class="b ${b<0?'neg':''}">${k(b)}</div></div>`}
 return h+'</div><div class="note">Her kutudaki sayı o günün sonundaki cebindeki para. 🟢 gelir 🔴 gider var.</div>'}
 function day(){let h='<div class="wrap"><table><tr><th>Gün</th><th>Gelir</th><th>Gider</th><th>Bakiye</th></tr>';
 const n=new Date(Date.UTC(+MS[mi].slice(0,4),+MS[mi].slice(5),0)).getUTCDate();
 for(let i=1;i<=n;i++){const d=MS[mi]+'-'+p2(i);if(d<S||d>E)continue;const its=byd[d]||[],g=its.filter(x=>x.a>0).reduce((s,x)=>s+x.a,0),x=its.filter(x=>x.a<0).reduce((s,x)=>s+x.a,0);
-h+=`<tr data-d="${d}" class="${sel===d?'sel':''}" style="cursor:pointer"><td>${i}</td><td class="pos">${g?f(g):''}</td><td class="neg">${x?f(-x):''}</td><td class="${bal[d]<0?'neg':''}"><b>${f(bal[d])}</b></td></tr>`}
+h+=`<tr data-d="${d}" class="${sel===d?'sel':''}${d===tdy()?' today':''}${d<tdy()?' past':''}" style="cursor:pointer"><td>${i}${d===tdy()?' (bugün)':''}</td><td class="pos">${g?f(g):''}</td><td class="neg">${x?f(-x):''}</td><td class="${bal[d]<0?'neg':''}"><b>${f(bal[d])}</b></td></tr>`}
 return h+'</table></div>'}
 function add(){const e=ed&&st.items.find(i=>i.id===ed),d=e?e.d:(sel||(MS[mi]+'-01')),dd=d<S?S:d;
 return `<div class="panel"><label>Tarih</label><input id="fd" type="date" min="${S}" max="${E}" value="${dd}">
@@ -100,12 +102,12 @@ return `<div class="panel"><label>Tarih</label><input id="fd" type="date" min="$
 <label>Kategori (kendin yaz)</label><input id="fc" placeholder="örn. burs, KYK, market" value="${e?esc(guess(e)).replace(/"/g,'&quot;'):''}"><label>Hangi borca ödeme (borç ödemesiyse)</label><select id="fb"><option value="">Borç ödemesi değil</option>${(st.debts||[]).map(x=>`<option value="${x.id}"${e&&e.b===x.id?' selected':''}>${esc(x.n)}</option>`).join('')}</select>
 <div class="chk"><input id="fr" type="checkbox"><span>Her ay aynı güne tekrarla (Eylül sonuna kadar)</span></div>
 <button class="btn p" id="fs">Kaydet</button><button class="btn" id="fx" style="width:100%;margin-top:8px;display:${e?'block':'none'}">Vazgeç</button></div>`}
-function detail(){const el=document.getElementById('detail');if(view==='add'||view==='debt'||!sel||!bal[sel]&&bal[sel]!==0){el.innerHTML='';return}
+function detail(){const el=document.getElementById('detail');if(view==='add'||view==='debt'||view==='rep'||!sel||!bal[sel]&&bal[sel]!==0){el.innerHTML='';return}
 const its=byd[sel]||[];el.innerHTML=`<div class="panel"><b>${dl(sel)}</b> · cebinde <b class="${bal[sel]<0?'neg':''}">${f(bal[sel])} ₺</b>`+(its.length?its.map(i=>`<div class="row"><span>${esc(i.t)}<br><small style="color:var(--mu)">${esc(guess(i))}${i.b?' · → '+esc((((st.debts||[]).find(x=>x.id===i.b))||{}).n||''):''}</small></span><span><b class="${i.a<0?'neg':'pos'}">${i.a>0?'+':''}${f(i.a)}</b> <button class="x" style="color:var(--ac)" data-e="${i.id}">✎</button><button class="x" data-x="${i.id}">×</button></span></div>`).join(''):'<div class="note">Bu güne kayıt yok.</div>')+'<button class="btn" id="ad" style="margin-top:8px;width:100%">+ Bu güne ekle</button></div>';
 document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{st.items=st.items.filter(i=>i.id!==b.dataset.x);save();render()});
 document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{ed=b.dataset.e;view='add';render()});
 ad.onclick=()=>{ed=null;view='add';render()};if(view==='day'){const tr=document.querySelector('tr.sel');if(tr){const n=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;td.style.textAlign='left';while(el.firstChild)td.appendChild(el.firstChild);n.appendChild(td);tr.after(n)}}}
-const tdy=()=>{const t=new Date().toISOString().slice(0,10);return t<S?S:t>E?E:t};
+const tdy=()=>{const n=new Date(),t=n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());return t<S?S:t>E?E:t};
 function debt(){const D=st.debts,t=tdy(),A={};D.forEach(x=>A[x.id]={c:x.p,pd:0,pa:0,it:0,ia:0,rt:x.p,end:null});
 for(let d=S;d<=E;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)D.forEach(x=>{const a=A[x.id],q=a.c*x.r/100;a.c+=q;a.ia+=q;if(d<=t)a.it+=q});
 (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}});
@@ -119,9 +121,20 @@ const sim=(id,upto)=>{const x=st.debts.find(z=>z.id===id);let c=x.p;for(let d=S;
 const head=d=>{let b=+st.start||0,m=Infinity;const net={};st.items.forEach(i=>{if(i.d>=S&&i.d<=E)net[i.d]=(net[i.d]||0)+i.a});for(let x=S;x<=E;x=nx(x)){b+=net[x]||0;if(x>=d&&b<m)m=b}return m};
 adj.forEach(i=>{const r=sim(i.b,i.d),as=/asgari/i.test(i.t)?r*0.2:0,h=Math.max(0,head(i.d));let q=Math.min(r,Math.max(as,h));q=q>=r?Math.ceil(r):Math.floor(q);i.a=-q});
 st.items=st.items.filter(i=>!(adj.includes(i)&&i.a>-1))}
-function render(){build();cards();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));nav();
-const v=document.getElementById('view');v.innerHTML=view==='cal'?cal():view==='day'?day():view==='debt'?debt():add();
+function debtRem(upto){let s=0;(st.debts||[]).forEach(x=>{let c=x.p;for(let d=S;d<=upto;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)c*=1+x.r/100;st.items.forEach(i=>{if(i.b===x.id&&i.d===d&&i.a<0)c=Math.max(0,c+i.a)})}s+=c});return s}
+function banner(){const t=tdy(),seen=st.seen||[];let p=null;MS.forEach(m=>{const n=new Date(Date.UTC(+m.slice(0,4),+m.slice(5),0)).getUTCDate(),z=m+'-'+p2(n);if(z<=t&&z<=E&&!seen.includes(m))p=m});const el=document.getElementById('bn');el.innerHTML=p?`<div class="panel" style="margin-bottom:10px;border-color:var(--ac)"><b>📋 ${MN[+p.slice(5)-1]} ayı raporu hazır</b><button class="btn" id="bg" style="margin-left:8px">Gör</button></div>`:'';if(p)bg.onclick=()=>{mi=MS.indexOf(p);view='rep';render()}}
+function rep(){const m=MS[mi],n=new Date(Date.UTC(+m.slice(0,4),+m.slice(5),0)).getUTCDate(),a=m+'-01',z=m+'-'+p2(n),fs=a<S?S:a,fe=z>E?E:z;
+const pv=d=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-1);return t.toISOString().slice(0,10)};
+const inc={},exp={};let gi=0,ge=0,kd=0,kn=0,bd=0;
+st.items.forEach(i=>{if(i.d<fs||i.d>fe)return;const c=guess(i);if(i.a>0){inc[c]=(inc[c]||0)+i.a;gi+=i.a}else{exp[c]=(exp[c]||0)-i.a;ge-=i.a;if(i.c==='Kayıt dışı'){kd-=i.a;kn++}if(i.b)bd-=i.a}});
+const op=fs===S?(+st.start||0):(bal[pv(fs)]||0),cl=bal[fe]||0;let mn=Infinity,md=fs,ng=0;for(let d=fs;d<=fe;d=nx(d)){if(bal[d]<mn){mn=bal[d];md=d}if(bal[d]<0)ng++}
+const RW=(l,v,c)=>`<div class="row"><span>${l}</span><b class="${c||''}">${f(v)} ₺</b></div>`,L=o=>Object.entries(o).sort((x,y)=>y[1]-x[1]).map(([k,v])=>RW(esc(k),v)).join('')||'<div class="note">Kayıt yok</div>';
+const d0=debtRem(pv(fs)),d1=debtRem(fe),late=z<=tdy()?'':'<div class="note" style="margin-bottom:8px">Bu ay henüz bitmedi, rakamların bir kısmı plana göre.</div>';
+return late+`<div class="panel"><b>📋 ${MN[+m.slice(5)-1]} ${m.slice(0,4)} raporu</b><div class="note" style="margin:2px 0 6px">${dl(fs)} – ${dl(fe)}</div>${RW('Açılış bakiyesi',op)}${RW('Toplam gelir',gi,'pos')}${RW('Toplam gider',ge,'neg')}${RW('Kapanış bakiyesi',cl,cl<0?'neg':'')}${RW('Net değişim',cl-op,cl-op<0?'neg':'pos')}<div class="row"><span>En düşük bakiye</span><b class="${mn<0?'neg':''}">${f(mn)} ₺ · ${dl(md)}</b></div><div class="row"><span>Eksiye düştüğü gün</span><b>${ng}</b></div></div><div class="panel" style="margin-top:8px;${kd?'border-color:var(--rd)':''}"><b>Kayıt dışı harcama</b>${kd?RW('Toplam ('+kn+' düzeltme)',kd,'neg'):'<div class="note">Bu ay kayıt dışı harcama yok ✓</div>'}</div><div class="panel" style="margin-top:8px"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Bu ay ödenen',bd)}${RW('Eklenen faiz',Math.max(0,d1-d0+bd))}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div><div class="panel" style="margin-top:8px"><b>Gelirler</b>${L(inc)}</div><div class="panel" style="margin-top:8px"><b>Giderler</b>${L(exp)}</div>`}
+function render(){build();cards();banner();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));nav();
+const v=document.getElementById('view');v.innerHTML=view==='cal'?cal():view==='day'?day():view==='debt'?debt():view==='rep'?rep():add();if(view==='rep'){st.seen=st.seen||[];if(!st.seen.includes(MS[mi])){st.seen.push(MS[mi]);save();banner()}}
 v.querySelectorAll('[data-d]').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.d?null:e.dataset.d;render()});
+if(view==='day'&&!window.__sc){const r=v.querySelector('tr.today');if(r){window.__sc=1;r.scrollIntoView({block:'center'})}}
 if(view==='debt'){v.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const x=st.debts.find(z=>z.id===i.dataset.id);x[i.dataset.k]=i.dataset.k==='n'?i.value:(+i.value||0);save();render()});v.querySelectorAll('[data-dx]').forEach(b=>b.onclick=()=>{st.debts=st.debts.filter(z=>z.id!==b.dataset.dx);st.items.forEach(i=>{if(i.b===b.dataset.dx)delete i.b});save();render()});fz.onchange=()=>{st.fz=fz.checked;save();render()};nd.onclick=()=>{st.debts.push({id:uid(),n:'Yeni borç',p:0,r:4});save();render()};ap.onclick=()=>{autopay();save();render()}}
 if(view==='add'){const e0=ed&&st.items.find(i=>i.id===ed);if(e0)fr.parentElement.style.display='none';fx.onclick=()=>{ed=null;view='cal';render()};
 fs.onclick=()=>{const d=fd.value,t=ft.value.trim()||'Kayıt',a=Math.abs(+fa.value)*(+fk.value),c=fc.value.trim(),b=fb.value||undefined;if(!d||!+fa.value||d<S||d>E)return;if(e0){Object.assign(e0,{d,t,a,c,b});ed=null;save();sel=d;mi=Math.max(0,MS.indexOf(d.slice(0,7)));view='cal';render();return}
@@ -130,6 +143,8 @@ ms.forEach((mm,i)=>{const[y,mo]=mm.split('-').map(Number),n=new Date(Date.UTC(y,
 save();sel=d;mi=Math.max(0,m);view='cal';render()}}
 detail()}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ed=null;view=b.dataset.v;render()});
+{const t0=tdy();mi=Math.max(0,MS.indexOf(t0.slice(0,7)));sel=t0}
+rbtn.onclick=()=>{if(rb.value==='')return;const t=tdy(),diff=Math.round(+rb.value-(bal[t]||0));if(!diff){rbm.textContent='Fark yok, plan tutuyor ✓';return}st.items.push({id:uid(),d:t,t:diff<0?'Kayıt dışı harcama':'Kayıt dışı gelir',a:diff,c:'Kayıt dışı'});save();rb.value='';sel=t;mi=Math.max(0,MS.indexOf(t.slice(0,7)));render();rbm.textContent=(diff<0?'Kayıt dışı harcama: ':'Kayıt dışı gelir: ')+f(Math.abs(diff))+' ₺ ('+dl(t)+' gününe işlendi)'};
 if(!st.s3){st.s3=1;autopay();save()}
 if(!st.s4){st.s4=1;['2027-06','2027-07','2027-08','2027-09'].forEach(m=>R.forEach(([d,t,a,b])=>{const n=new Date(Date.UTC(+m.slice(0,4),+m.slice(5),0)).getUTCDate();st.items.push({id:uid(),d:m+'-'+p2(Math.min(d,n)),t,a,c:a>0?(t==='Abi desteği'?'Aile desteği':t):undefined,b})}));autopay();save()}
 bs.onclick=()=>{bk.value=JSON.stringify(st);bk.focus();bk.select();try{document.execCommand('copy')}catch(e){}};bl.onclick=()=>{try{const x=JSON.parse(bk.value);if(!x||!Array.isArray(x.items))return;st=x;save();document.getElementById('st').value=st.start||0;render()}catch(e){bk.value='Yedek okunamadı'}};
