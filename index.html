@@ -151,24 +151,30 @@ function setSheet(){sheet(`<h3>Ayarlar ve yedek</h3><label>Başlangıç bakiyesi
  $('bl').onclick=()=>{try{load(JSON.parse($('bk').value))}catch(e){toast('Yedek okunamadı: '+e.message)}};
 })}
 function debtBalanceAt(x,upto){
- let c=Math.max(0,+x.p||0);
+ let c=Math.max(0,+x.p||0),cut=x.reconciledAt||'',anchor=Number.isFinite(+x.reconciledBalance)?Math.max(0,+x.reconciledBalance):null;
  for(let d=S;d<=upto;d=nx(d)){
-  if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||4)/100;
+  // Banka eşitlemesi o günün tüm geçmiş hareketlerinden SONRA geçerlidir.
+  if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||0)/100;
   (byd[d]||[]).forEach(i=>{if(i.b===x.id&&i.a<0)c=Math.max(0,c+i.a)});
-  if(x.reconciledAt===d)c=Math.max(0,+x.reconciledBalance||0);
+  if(cut===d&&anchor!==null)c=anchor;
  }
  return c;
 }
-function debtRem(upto){let s=0;st.debts.forEach(x=>{let c=x.p;for(let d=S;d<=upto;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)c*=1+x.r/100;st.items.forEach(i=>{if(i.b===x.id&&i.d===d&&i.a<0)c=Math.max(0,c+i.a)})}if(x.reconciledAt&&x.reconciledAt<=upto)c=debtBalanceAt(x,upto);s+=c});return s}
-function debtView(){const Dd=st.debts,t=tdy(),A={};Dd.forEach(x=>A[x.id]={c:x.p,pd:0,pa:0,ia:0,rt:x.p,end:null});
-for(let d=S;d<=E;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*x.r/100;a.c+=q;a.ia+=q});
-(byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}});
-Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d)a.c=Math.max(0,+x.reconciledBalance||0);if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d})}
-const sm=k=>Dd.reduce((s,x)=>s+(k==='p'?x.p:A[x.id][k]),0);
-return`<div class="hero"><small>Şimdi toplam borç</small><div class="big">${f(sm('rt'))} ₺</div><div class="chips"><div class="chip">Bugüne dek ödenen<b>${f(sm('pd'))} ₺</b></div><div class="chip">${dl(E)} kalan<b>${f(sm('c'))} ₺</b></div></div><div class="chips"><div class="chip">Başlangıç<b>${f(sm('p'))} ₺</b></div><div class="chip">Faiz (dönem sonuna)<b>${f(sm('ia'))} ₺</b></div></div></div>
+function debtRem(upto){return st.debts.reduce((sum,x)=>sum+debtBalanceAt(x,upto),0)}
+function debtView(){
+ const Dd=st.debts,t=tdy(),A={};
+ Dd.forEach(x=>A[x.id]={c:Math.max(0,+x.p||0),pd:0,pa:0,ia:0,rt:0,end:null});
+ for(let d=S;d<=E;d=nx(d)){
+  if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*(+x.r||0)/100;a.c+=q;a.ia+=q});
+  (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}});
+  Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance))a.c=Math.max(0,+x.reconciledBalance);if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
+ }
+ const sm=k=>Dd.reduce((sum,x)=>sum+(k==='p'?(+x.p||0):A[x.id][k]),0);
+ return`<div class="hero"><small>Şimdi toplam borç</small><div class="big">${f(sm('rt'))} ₺</div><div class="chips"><div class="chip">Bugüne dek ödenen<b>${f(sm('pd'))} ₺</b></div><div class="chip">${dl(E)} kalan<b>${f(sm('c'))} ₺</b></div></div><div class="chips"><div class="chip">Başlangıç<b>${f(sm('p'))} ₺</b></div><div class="chip">Faiz (dönem sonuna)<b>${f(sm('ia'))} ₺</b></div></div></div>
 <label class="chk" style="margin:0 0 10px"><input id="fz" type="checkbox"${st.fz?' checked':''}> Faizi hesapla (her ayın 1’inde kalan borca eklenir)</label>`+
-(Dd.length?Dd.map(x=>{const a=A[x.id],pr=Math.min(100,a.pa/(x.p+a.ia||1)*100);return`<div class="panel" data-x="${x.id}"><div class="row" style="border:0;padding:0"><b>${esc(x.n)}</b><b>${f(a.rt)} ₺</b></div><div class="bar"><i style="width:${pr}%"></i></div><div class="note">Ödenen ${f(a.pd)} ₺ · Faiz %${x.r}/ay · ${!x.p?'-':a.end?'Biter: '+dl(a.end):dl(E)+' sonuna kadar bitmiyor'}</div><div class="two"><button class="btn" data-plan-open="${x.id}">Ödeme planı</button><button class="btn" data-reconcile="${x.id}">Borcu eşitle</button></div></div>`}).join(''):'<p class="note">Henüz borç eklenmedi.</p>')+
-'<button class="btn w" id="nd">+ Borç ekle</button><button class="btn w" id="ap">Ödemeler için planı aç</button><p class="note">Borca ödeme girerken “Hangi borca ödeme” alanından borcu seç. Faiz tahmini hesaptır, bankadaki rakamla küçük fark olabilir.</p>'}
+ (Dd.length?Dd.map(x=>{const a=A[x.id],pr=Math.min(100,a.pa/(x.p+a.ia||1)*100);return`<div class="panel" data-x="${x.id}"><div class="row" style="border:0;padding:0"><b>${esc(x.n)}</b><b>${f(a.rt)} ₺</b></div><div class="bar"><i style="width:${pr}%"></i></div><div class="note">${x.reconciledAt?'Bankayla '+dl(x.reconciledAt)+' tarihinde eşitlendi · ':''}Geçmiş ödemeler ${f(a.pd)} ₺ · Faiz %${x.r}/ay · ${!x.p?'-':a.end?'Biter: '+dl(a.end):dl(E)+' sonuna kadar bitmiyor'}</div><div class="two"><button class="btn" data-plan-open="${x.id}">Ödeme planı</button><button class="btn" data-reconcile="${x.id}">Borcu eşitle</button></div></div>`}).join(''):'<p class="note">Henüz borç eklenmedi.</p>')+
+ '<button class="btn w" id="nd">+ Borç ekle</button><p class="note">Borcu eşitle, girilen tutarı bugün itibarıyla kesin başlangıç noktası kabul eder. Önceki ödemeler yeniden düşülmez; sonraki ödemeler ve faizler hesaplanır.</p>'
+}
 function debtSheet(id){const x=st.debts.find(z=>z.id===id);if(!x)return;sheet(`<h3>Borç</h3><label>Ad</label><input id="dn" value="${att(x.n)}"><label>Başlangıç tutarı (₺)</label><input id="dp" type="number" inputmode="decimal" value="${x.p}"><label>Aylık faiz %</label><input id="dr" type="number" inputmode="decimal" step="0.1" value="${x.r}"><button class="btn p" id="ds">Kaydet</button><button class="btn dz" id="dx">Borcu sil</button>`,()=>{
 $('dn').select();$('ds').onclick=()=>{x.n=$('dn').value.trim()||'Borç';x.p=+$('dp').value||0;x.r=+$('dr').value||0;save();close();render()};
 $('dx').onclick=()=>{st.debts=st.debts.filter(z=>z!==x);st.items.forEach(i=>{if(i.b===id)delete i.b});save();close();render()}})}
