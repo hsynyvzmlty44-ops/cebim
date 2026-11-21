@@ -143,16 +143,25 @@ function setSheet(){sheet(`<h3>Ayarlar</h3><label>Başlangıç bakiyesi (12 Ekim
 $('sb').onchange=()=>{st.start=+$('sb').value||0;save();render()};
 $('bs').onclick=()=>{$('bk').value=JSON.stringify(st);$('bk').focus();$('bk').select();try{document.execCommand('copy')}catch(e){}};
 $('bl').onclick=()=>{try{const x=JSON.parse($('bk').value);if(!x||!Array.isArray(x.items))throw 0;st=Object.assign({start:0,items:[],debts:[],fz:true,seen:[]},x);save();close();render()}catch(e){$('bk').value='Yedek okunamadı'}}})}
-function debtRem(upto){let s=0;st.debts.forEach(x=>{let c=x.p;for(let d=S;d<=upto;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)c*=1+x.r/100;st.items.forEach(i=>{if(i.b===x.id&&i.d===d&&i.a<0)c=Math.max(0,c+i.a)})}s+=c});return s}
+function debtBalanceAt(x,upto){
+ let c=Math.max(0,+x.p||0);
+ for(let d=S;d<=upto;d=nx(d)){
+  if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||4)/100;
+  (byd[d]||[]).forEach(i=>{if(i.b===x.id&&i.a<0)c=Math.max(0,c+i.a)});
+  if(x.reconciledAt===d)c=Math.max(0,+x.reconciledBalance||0);
+ }
+ return c;
+}
+function debtRem(upto){let s=0;st.debts.forEach(x=>{let c=x.p;for(let d=S;d<=upto;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)c*=1+x.r/100;st.items.forEach(i=>{if(i.b===x.id&&i.d===d&&i.a<0)c=Math.max(0,c+i.a)})}if(x.reconciledAt&&x.reconciledAt<=upto)c=debtBalanceAt(x,upto);s+=c});return s}
 function debtView(){const Dd=st.debts,t=tdy(),A={};Dd.forEach(x=>A[x.id]={c:x.p,pd:0,pa:0,ia:0,rt:x.p,end:null});
 for(let d=S;d<=E;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*x.r/100;a.c+=q;a.ia+=q});
 (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}});
-Dd.forEach(x=>{const a=A[x.id];if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d})}
+Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d)a.c=Math.max(0,+x.reconciledBalance||0);if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d})}
 const sm=k=>Dd.reduce((s,x)=>s+(k==='p'?x.p:A[x.id][k]),0);
 return`<div class="hero"><small>Şimdi toplam borç</small><div class="big">${f(sm('rt'))} ₺</div><div class="chips"><div class="chip">Bugüne dek ödenen<b>${f(sm('pd'))} ₺</b></div><div class="chip">${dl(E)} kalan<b>${f(sm('c'))} ₺</b></div></div><div class="chips"><div class="chip">Başlangıç<b>${f(sm('p'))} ₺</b></div><div class="chip">Faiz (dönem sonuna)<b>${f(sm('ia'))} ₺</b></div></div></div>
 <label class="chk" style="margin:0 0 10px"><input id="fz" type="checkbox"${st.fz?' checked':''}> Faizi hesapla (her ayın 1’inde kalan borca eklenir)</label>`+
 (Dd.length?Dd.map(x=>{const a=A[x.id],pr=Math.min(100,a.pa/(x.p+a.ia||1)*100);return`<div class="panel" data-x="${x.id}"><div class="row" style="border:0;padding:0"><b>${esc(x.n)}</b><b>${f(a.rt)} ₺</b></div><div class="bar"><i style="width:${pr}%"></i></div><div class="note">Ödenen ${f(a.pd)} ₺ · Faiz %${x.r}/ay · ${!x.p?'-':a.end?'Biter: '+dl(a.end):dl(E)+' sonuna kadar bitmiyor'}</div><div class="two"><button class="btn" data-plan-open="${x.id}">Ödeme planı</button><button class="btn" data-reconcile="${x.id}">Borcu eşitle</button></div></div>`}).join(''):'<p class="note">Henüz borç eklenmedi.</p>')+
-'<button class="btn w" id="nd">+ Borç ekle</button><button class="btn w" id="ap">Kart ödemelerini otomatik ayarla</button><p class="note">Borca ödeme girerken “Hangi borca ödeme” alanından borcu seç. Faiz tahmini hesaptır, bankadaki rakamla küçük fark olabilir.</p>'}
+'<button class="btn w" id="nd">+ Borç ekle</button><button class="btn w" id="ap">Ödemeler için planı aç</button><p class="note">Borca ödeme girerken “Hangi borca ödeme” alanından borcu seç. Faiz tahmini hesaptır, bankadaki rakamla küçük fark olabilir.</p>'}
 function debtSheet(id){const x=st.debts.find(z=>z.id===id);if(!x)return;sheet(`<h3>Borç</h3><label>Ad</label><input id="dn" value="${att(x.n)}"><label>Başlangıç tutarı (₺)</label><input id="dp" type="number" inputmode="decimal" value="${x.p}"><label>Aylık faiz %</label><input id="dr" type="number" inputmode="decimal" step="0.1" value="${x.r}"><button class="btn p" id="ds">Kaydet</button><button class="btn dz" id="dx">Borcu sil</button>`,()=>{
 $('dn').select();$('ds').onclick=()=>{x.n=$('dn').value.trim()||'Borç';x.p=+$('dp').value||0;x.r=+$('dr').value||0;save();close();render()};
 $('dx').onclick=()=>{st.debts=st.debts.filter(z=>z!==x);st.items.forEach(i=>{if(i.b===id)delete i.b});save();close();render()}})}
@@ -160,7 +169,7 @@ $('dx').onclick=()=>{st.debts=st.debts.filter(z=>z!==x);st.items.forEach(i=>{if(
 /* Borç planlayıcı: varsayılan %20 asgari, %4 aylık tahmini faiz. */
 const debtDate=(y,m,day)=>y+'-'+p2(m)+'-'+p2(Math.min(day,new Date(y,m,0).getDate()));
 function debtSchedule(x){
- let c=Math.max(0,+x.p||0), out=[], now=new Date(tdy()+'T12:00:00');
+ let c=debtBalanceAt(x,tdy()), out=[], now=new Date(tdy()+'T12:00:00');
  let day=Math.min(28,Math.max(1,+x.dueDay||6));
  let y=now.getFullYear(),m=now.getMonth()+1;
  if(debtDate(y,m,day)<tdy()){m++;if(m>12){m=1;y++}}
@@ -189,7 +198,7 @@ function debtPlanSheet(id){
  $('ddsave').onclick=()=>{x.dueDay=Math.min(28,Math.max(1,+$('dday').value||6));save();close();debtPlanSheet(id)};
  $('planSave').onclick=()=>{
   const inputs=[...document.querySelectorAll('[data-plan]')];
-  inputs.forEach(e=>{x.planOverrides[e.dataset.plan]=Math.max(0,+e.value||0)});
+  inputs.forEach(e=>{const amount=Math.max(0,+e.value||0);if(amount>0)x.planOverrides[e.dataset.plan]=amount;else delete x.planOverrides[e.dataset.plan]});
   const today=tdy();
   st.items=st.items.filter(i=>!(i.autoDebt===id&&i.d>today));
   const future=debtSchedule(x).filter(z=>z.date>today&&z.date<=E&&z.pay>0);
@@ -203,14 +212,13 @@ function debtPlanSheet(id){
 }
 function debtReconcile(id){
  const x=st.debts.find(v=>v.id===id);if(!x)return;
- const current=debtRem(tdy()); 
- sheet('<h3>'+esc(x.n)+' · Borç eşitle</h3><p class="note">Bankada görünen güncel borcu yaz. Bu işlem farkı otomatik olarak harcama saymaz; borcun başlangıç değerini düzeltir.</p><label>Bankadaki güncel borç (₺)</label><input id="actualDebt" type="number" step="0.01" inputmode="decimal" value="'+Math.round((+x.p||0)*100)/100+'"><button class="btn p" id="reconcileDebt">Borcu güncelle</button>',()=>{
+ const current=debtBalanceAt(x,tdy()); 
+ sheet('<h3>'+esc(x.n)+' · Borç eşitle</h3><p class="note">Bankada görünen güncel borcu yaz. Bu işlem farkı otomatik olarak harcama saymaz; geçmiş kayıtları değiştirmeden bugünkü borç bakiyesini sabitler.</p><label>Bankadaki güncel borç (₺)</label><input id="actualDebt" type="number" step="0.01" inputmode="decimal" value="'+Math.round(current*100)/100+'"><button class="btn p" id="reconcileDebt">Borcu güncelle</button>',()=>{
  $('reconcileDebt').onclick=()=>{
   const value=+$('actualDebt').value;
   if(!Number.isFinite(value)||value<0)return toast('Geçerli tutar gir');
   // Yeni baz borç: eski ödemeleri tekrar düşmemek için geçmiş bağlantıları koruyup dengele.
-  const old=+x.p||0;
-  x.p=value;
+  x.reconciledBalance=value;
   x.reconciledAt=tdy();
   x.reconcileNote='Banka bakiyesiyle manuel eşitlendi; eski ödemeler ayrıca gözden geçirilmeli';
   st.items=st.items.filter(i=>!(i.autoDebt===id&&i.d>tdy()));
@@ -219,13 +227,7 @@ function debtReconcile(id){
  });
 }
 
-function autopay(){const ids=st.debts.filter(x=>/kart/i.test(x.n)&&!/avans/i.test(x.n)).map(x=>x.id),seen={};
-st.items=st.items.filter(i=>{if(i.b&&ids.includes(i.b)&&i.a<0&&i.d>=S&&i.d<=E){const k=i.b+i.d;if(seen[k])return false;seen[k]=1;if(/asgari/i.test(i.t))i.t='Kart ödemesi (asgari+ekstra)'}return true});
-const adj=st.items.filter(i=>i.b&&ids.includes(i.b)&&i.a<0&&i.d>=S&&i.d<=E).sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);adj.forEach(i=>i.a=0);
-const sim=(id,upto)=>{const x=st.debts.find(z=>z.id===id);let c=x.p;for(let d=S;d<=upto;d=nx(d)){if(d>S&&d.slice(8)==='01'&&st.fz)c*=1+x.r/100;st.items.forEach(i=>{if(i.b===id&&i.d===d&&i.a<0)c=Math.max(0,c+i.a)})}return c};
-const head=d=>{let b=+st.start||0,m=Infinity;const net={};st.items.forEach(i=>{if(i.d>=S&&i.d<=E)net[i.d]=(net[i.d]||0)+i.a});for(let x=S;x<=E;x=nx(x)){b+=net[x]||0;if(x>=d&&b<m)m=b}return m};
-adj.forEach(i=>{const r=sim(i.b,i.d),as=/asgari/i.test(i.t)?r*0.2:0,h=Math.max(0,head(i.d));let q=Math.min(r,Math.max(as,h));q=q>=r?Math.ceil(r):Math.floor(q);i.a=-q});
-st.items=st.items.filter(i=>!(adj.includes(i)&&i.a>-1))}
+function autopay(){toast('Mevcut ödemeler korunuyor. Her borçtaki Ödeme planı düğmesini kullan.');}
 function repView(){const m=MS[mi],[y,mo]=m.split('-').map(Number),z=m+'-'+p2(dim(y,mo)),fs=m+'-01'<S?S:m+'-01',fe=z>E?E:z;
 const inc={},exp={};let gi=0,ge=0,kd=0,kn=0,bd=0;
 st.items.forEach(i=>{if(i.d<fs||i.d>fe)return;const c=guess(i);if(i.a>0){inc[c]=(inc[c]||0)+i.a;gi+=i.a}else{exp[c]=(exp[c]||0)-i.a;ge-=i.a;if(i.c==='Kayıt dışı'){kd-=i.a;kn++}if(i.b)bd-=i.a}});
