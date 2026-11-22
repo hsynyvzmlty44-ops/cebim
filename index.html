@@ -171,13 +171,23 @@ function setSheet(){sheet(`<h3>Ayarlar ve yedek</h3><label>Başlangıç bakiyesi
  $('bp').onclick=async()=>{try{$('bk').value=await navigator.clipboard.readText();toast('Yedek panodan alındı')}catch(e){$('bk').focus();toast('Metin kutusuna basılı tutup Yapıştır seç')}};
  $('bl').onclick=()=>{try{load(JSON.parse($('bk').value))}catch(e){toast('Yedek okunamadı: '+e.message)}};
 })}
+function afterReconcileItems(x,d){
+ if(!Array.isArray(x.reconciledItemIds))return [];
+ const captured=new Set(x.reconciledItemIds);
+ return (byd[d]||[]).filter(i=>i.b===x.id&&!captured.has(i.id));
+}
+function applyDebtEntry(c,i){
+ if(kind(i)==='card'&&i.a<0)return c-i.a;
+ if(kind(i)==='debt'&&i.a<0)return Math.max(0,c+i.a);
+ return c;
+}
 function debtBalanceAt(x,upto){
  let c=Math.max(0,+x.p||0),cut=x.reconciledAt||'',anchor=Number.isFinite(+x.reconciledBalance)?Math.max(0,+x.reconciledBalance):null;
  for(let d=S;d<=upto;d=nx(d)){
   // Banka eşitlemesi o günün tüm geçmiş hareketlerinden SONRA geçerlidir.
   if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||0)/100;
   (byd[d]||[]).forEach(i=>{if(i.b!==x.id||i.a>=0)return;if(kind(i)==='card')c-=i.a;else if(kind(i)==='debt')c=Math.max(0,c+i.a)});
-  if(cut===d&&anchor!==null)c=anchor;
+  if(cut===d&&anchor!==null){c=anchor;afterReconcileItems(x,d).forEach(i=>{c=applyDebtEntry(c,i)})}
  }
  return c;
 }
@@ -188,7 +198,7 @@ function debtView(){
  for(let d=S;d<=E;d=nx(d)){
   if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*(+x.r||0)/100;a.c+=q;a.ia+=q});
   (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){if(kind(i)==='card')a.c-=i.a;else if(kind(i)==='debt'){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}}});
-  Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance))a.c=Math.max(0,+x.reconciledBalance);if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
+  Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){a.c=Math.max(0,+x.reconciledBalance);afterReconcileItems(x,d).forEach(i=>{a.c=applyDebtEntry(a.c,i)})}if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
  }
  const sm=k=>Dd.reduce((sum,x)=>sum+(k==='p'?(+x.p||0):A[x.id][k]),0);
  return`<div class="hero"><small>Şimdi toplam borç</small><div class="big">${f(sm('rt'))} ₺</div><div class="chips"><div class="chip">Bugüne dek ödenen<b>${f(sm('pd'))} ₺</b></div><div class="chip">${dl(E)} kalan<b>${f(sm('c'))} ₺</b></div></div><div class="chips"><div class="chip">Başlangıç<b>${f(sm('p'))} ₺</b></div><div class="chip">Faiz (dönem sonuna)<b>${f(sm('ia'))} ₺</b></div></div></div>
@@ -307,6 +317,7 @@ function debtReconcile(id){
   // Yeni baz borç: eski ödemeleri tekrar düşmemek için geçmiş bağlantıları koruyup dengele.
   x.reconciledBalance=value;
   x.reconciledAt=tdy();
+  x.reconciledItemIds=st.items.filter(i=>i.b===id&&i.d===tdy()).map(i=>i.id);
   x.reconcileNote='Banka bakiyesiyle manuel eşitlendi; eski ödemeler ayrıca gözden geçirilmeli';
   st.items=st.items.filter(i=>!(i.autoDebt===id&&i.d>tdy()));
   save();close();render();toast('Borç güncellendi; planı yeniden oluştur');
@@ -328,7 +339,7 @@ function debtActivity(fs,fe){
    });
    if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){
     const corrected=Math.max(0,+x.reconciledBalance);
-    activity.reconcile+=corrected-c;c=corrected;
+    activity.reconcile+=corrected-c;c=corrected;afterReconcileItems(x,d).forEach(i=>{c=applyDebtEntry(c,i)});
    }
   }
  });
