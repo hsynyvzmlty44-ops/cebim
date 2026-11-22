@@ -101,9 +101,19 @@ const dn=id=>((st.debts.find(x=>x.id===id))||{}).n||'';
 const sg=a=>(a>0?'+':'−')+f(Math.abs(a));
 // İşlemin finansal niteliği harcama tarihi ile ödeme kaynağından ayrı tutulur.
 // Eski kayıtlarda borca bağlı negatif hareketler borç ödemesi sayılır.
-const kind=i=>i.m==='adjustment'?'adjustment':i.a>0?'income':i.m==='card'&&i.b?'card':i.m==='debt'||(i.b&&i.m!=='cash')?'debt':'cash';
+const kind=i=>i.m==='adjustment'?'adjustment':i.m==='card'?'card':i.m==='debt'?'debt':i.a>0?'income':i.b&&i.m!=='cash'?'debt':'cash';
 const cashDelta=i=>kind(i)==='card'?0:i.a;
 const spending=i=>kind(i)==='cash'||kind(i)==='card';
+const roundMoney=n=>Math.round((+n||0)*100)/100;
+// Kullanıcının geçmişte karttan ödendiğini doğruladığı tek kayıt: 13 Kasım 2026, X.
+// Diğer harcamaların ödeme yöntemi tahmin edilmez. Önce kurtarma yedeği tutulur.
+function migrateKnownCardExpense(){
+ const item=st.items.find(i=>i.id==='didkw94'&&i.d==='2026-11-13'&&i.t==='X'&&i.a===-10000&&!i.m&&!i.b);
+ if(!item||!st.debts.some(d=>d.id==='zr'))return;
+ try{localStorage.setItem('cep1_before_card_migration_'+Date.now(),JSON.stringify(st))}catch(e){return}
+ item.m='card';item.b='zr';if(!item.c)item.c='Seyahat';save();
+}
+migrateKnownCardExpense();
 function build(){byd={};bal={};st.items.forEach(i=>{if(i.d>=S&&i.d<=E)(byd[i.d]=byd[i.d]||[]).push(i)});let b=+st.start||0;for(let d=S;d<=E;d=nx(d)){(byd[d]||[]).forEach(i=>b+=cashDelta(i));bal[d]=b}}
 const close=()=>$('ov').classList.remove('on');
 function sheet(h,m){const o=$('ov');o.innerHTML='<div class="sh">'+h+'</div>';o.classList.add('on');o.onclick=e=>{if(e.target===o)close()};if(m)m(o.firstChild)}
@@ -188,7 +198,7 @@ function debtView(){
 }
 function debtSheet(id){const x=st.debts.find(z=>z.id===id);if(!x)return;sheet(`<h3>Borç</h3><label>Ad</label><input id="dn" value="${att(x.n)}"><label>Başlangıç tutarı (₺)</label><input id="dp" type="number" inputmode="decimal" value="${x.p}"><label>Aylık faiz %</label><input id="dr" type="number" inputmode="decimal" step="0.1" value="${x.r}"><button class="btn p" id="ds">Kaydet</button><button class="btn dz" id="dx">Borcu sil</button>`,()=>{
 $('dn').select();$('ds').onclick=()=>{x.n=$('dn').value.trim()||'Borç';x.p=+$('dp').value||0;x.r=+$('dr').value||0;save();close();render()};
-$('dx').onclick=()=>{st.debts=st.debts.filter(z=>z!==x);st.items.forEach(i=>{if(i.b===id)delete i.b});save();close();render()}})}
+$('dx').onclick=()=>{const linked=st.items.filter(i=>i.b===id);if(linked.length){toast('Bu borca bağlı '+linked.length+' hareket var. Önce kayıtları başka borca taşı.');return}st.debts=st.debts.filter(z=>z!==x);save();close();render()}})}
 
 /* Borç planlayıcı: varsayılan %20 asgari, %4 aylık tahmini faiz. */
 const debtDate=(y,m,day)=>y+'-'+p2(m)+'-'+p2(Math.min(day,new Date(y,m,0).getDate()));
@@ -342,7 +352,7 @@ if($('ha'))$('ha').onclick=()=>{const q=MS[mi]===tdy().slice(0,7)?tdy():(MS[mi]+
 if(view==='day'&&!window.__sc){const r=m.querySelector('.today');if(r){window.__sc=1;r.scrollIntoView({block:'start'})}}
 if(view==='debt'){m.insertAdjacentHTML('afterbegin','<button class="btn" id="backExpenses" style="margin-bottom:14px">‹ Giderlere dön</button>');$('backExpenses').onclick=()=>changeView('expense');m.querySelectorAll('[data-plan-open]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtPlanSheet(b.dataset.planOpen)});m.querySelectorAll('[data-reconcile]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtReconcile(b.dataset.reconcile)});m.querySelectorAll('[data-x]').forEach(r=>r.onclick=()=>debtSheet(r.dataset.x));$('fz').onchange=()=>{st.fz=$('fz').checked;save();render()};
 $('nd').onclick=()=>{const id=uid();st.debts.push({id,n:'Yeni borç',p:0,r:4,dueDay:6,planOverrides:{}});save();render();debtSheet(id)};
-$('ap').onclick=()=>{autopay();save();render();toast('Kart ödemeleri yeniden ayarlandı')}}
+/* kaldırılan eski otomatik ödeme düğmesi */}
 if(view==='rep'){m.insertAdjacentHTML('afterbegin','<button class="btn" id="backHome" style="margin-bottom:14px">‹ Ana sayfa</button>');$('backHome').onclick=()=>changeView('home')}
 if(view==='rep'&&!st.seen.includes(MS[mi])){st.seen.push(MS[mi]);save();banner()}}
 $('fab').onclick=()=>form(null,tdy());$('gs').onclick=setSheet;
