@@ -319,8 +319,8 @@ function debtReconcile(id){
   x.reconciledAt=tdy();
   x.reconciledItemIds=st.items.filter(i=>i.b===id&&i.d===tdy()).map(i=>i.id);
   x.reconcileNote='Banka bakiyesiyle manuel eşitlendi; eski ödemeler ayrıca gözden geçirilmeli';
-  st.items=st.items.filter(i=>!(i.autoDebt===id&&i.d>tdy()));
-  save();close();render();toast('Borç güncellendi; planı yeniden oluştur');
+  // Gelecek ödeme planlarını SİLME: kullanıcı bu kayıtları ayrı ayrı onayladı.
+  save();close();render();toast('Borç eşitlendi; ödeme planların korundu');
  };
  });
 }
