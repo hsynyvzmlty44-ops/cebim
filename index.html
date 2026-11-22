@@ -329,17 +329,46 @@ const payRow=i=>`<div class="home-pay" data-e="${i.id}"><div class="home-pay-ico
 return `${st.items.length===0?`<div class="panel" style="padding:20px;border:1px solid var(--bd)"><b style="font-size:18px">Cebim'e hoş geldin</b><p class="home-muted">Önce başlangıç paranı ayarlardan gir, sonra gelir ve giderlerini ekle. Verilerin bu cihazda saklanır.</p><button class="btn p" id="welcomeStart">Başlangıç bakiyemi ayarla</button></div>`:''}<div class="home-section-title">Yaklaşan ödemeler <button id="allDay">Takvimi gör →</button></div><div class="panel">${upcoming.length?upcoming.map(payRow).join(''):'<div class="home-muted">Planlanan yaklaşan ödeme bulunmuyor.</div>'}</div>
 <div class="home-section-title">Bu ay <button id="allRep">Detaylı rapor →</button></div><div class="panel"><div class="home-eyebrow">${MN[mo-1]} ${y} · Aylık özet</div><div class="home-month"><div class="jump" data-go="income"><small>Gelirler ↗</small><b class="pos">+${f(income)} ₺</b></div><div class="jump" data-go="expense"><small>Giderler ↗</small><b class="neg">−${f(expense)} ₺</b></div></div><div class="home-foot">Bu tutarlar ayın gerçekleşmiş ve planlanmış işlemlerini birlikte içerir.</div></div>
 <div class="home-section-title">Son kayıtlar <button id="allDay2">Tümünü gör →</button></div><div class="panel">${recent.length?recent.map(payRow).join(''):'<div class="home-muted">Henüz işlem bulunmuyor. Alttaki + düğmesinden ekleyebilirsin.</div>'}</div>`}
-function moneyPage(kind){
- const inc=kind==='income',m=MS[mi],T=tdy(),[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',fe=m+'-'+p2(dim(y,mo))>E?E:m+'-'+p2(dim(y,mo));
- const items=st.items.filter(i=>i.d>=fs&&i.d<=fe&&(inc?kind(i)==='income':spending(i)||kind(i)==='debt')).sort((a,b)=>a.d.localeCompare(b.d));
- const total=items.filter(i=>inc||spending(i)).reduce((n,i)=>n+Math.abs(i.a),0),done=items.filter(i=>i.d<=T&&(inc||spending(i))).reduce((n,i)=>n+Math.abs(i.a),0);
- const cats={};items.forEach(i=>{const c=kind(i)==='debt'?'Borç ödemeleri (harcama değil)':guess(i);(cats[c]??=[]).push(i)});
- const row=i=>`<div class="row tappable" data-e="${i.id}"><span><b>${esc(i.t)}</b><br><small>${dl(i.d)} · ${i.d>T?'Planlandı':'Kayıtlı'}${kind(i)==='card'?' · 💳 Kredi kartı':kind(i)==='debt'?' · Borç ödemesi':''}</small></span><b class="${inc?'pos':'neg'}">${sg(i.a)} ₺</b></div>`;
+function cardHistorySheet(){
+ const cards=st.debts.filter(x=>/kart/i.test(x.n)&&!/avans/i.test(x.n));
+ if(!cards.length){toast('Önce bir kredi kartı borcu eklemelisin');return}
+ const candidates=st.items.filter(i=>i.a<0&&kind(i)==='cash'&&i.d<=tdy()).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,100);
+ const options=cards.map(x=>'<option value="'+att(x.id)+'">'+esc(x.n)+'</option>').join('');
+ sheet('<h3>Geçmiş kart harcamalarını ayır</h3><p class="note">Nakit harcaması olarak kayıtlı olup aslında kredi kartıyla aldığın ürün/hizmetleri işaretle. Harcama kendi tarihinde gider olarak KALIR; nakit bakiyenden düşmez, seçtiğin kartın borcuna eklenir. Bankada güncel borcu önceden eşitlediysen aynı geçmiş işlem yeniden sayılmaz.</p><label>Hangi kredi kartıyla?</label><select id="cardMigrationTarget">'+options+'</select><div id="cardOldList" style="max-height:50vh;overflow:auto">'+(candidates.length?candidates.map(i=>'<label class="panel" style="display:flex;align-items:center;gap:12px;margin:7px 0"><input type="checkbox" data-card-old="'+att(i.id)+'" style="width:22px;height:22px;flex:none"><span><b>'+esc(i.t)+'</b><br><small>'+dl(i.d)+' · '+f(-i.a)+' ₺ · '+esc(guess(i))+'</small></span></label>').join(''):'<p class="note">Kart olarak işaretlenebilecek eski nakit gideri bulunamadı.</p>')+'</div><button class="btn p" id="applyCardOld">Seçilenleri kart harcaması yap</button>',()=>{
+ $('applyCardOld').onclick=()=>{
+  const selected=[...document.querySelectorAll('[data-card-old]:checked')].map(e=>e.dataset.cardOld);
+  if(!selected.length){toast('Önce harcama seç');return}
+  const target=$('cardMigrationTarget').value;
+  if(!st.debts.some(x=>x.id===target)){toast('Kart seç');return}
+  try{localStorage.setItem('cep1_before_card_backfill_'+Date.now(),JSON.stringify(st))}catch(e){toast('Kurtarma yedeği oluşturulamadı, işlem yapılmadı');return}
+  let count=0;
+  st.items.forEach(i=>{if(selected.includes(i.id)&&i.a<0&&kind(i)==='cash'){i.m='card';i.b=target;count++}});
+  save();close();render();toast(count+' eski harcama karta taşındı');
+ };
+ });
+}
+function moneyPage(page){
+ const inc=page==='income',m=MS[mi],T=tdy(),[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',fe=m+'-'+p2(dim(y,mo))>E?E:m+'-'+p2(dim(y,mo));
+ const month=st.items.filter(i=>i.d>=fs&&i.d<=fe);
+ const spent=month.filter(i=>spending(i)&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
+ const debtPaid=month.filter(i=>kind(i)==='debt'&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
+ const incomes=month.filter(i=>kind(i)==='income').sort((a,b)=>a.d.localeCompare(b.d));
+ const items=inc?incomes:spent;
+ const total=items.reduce((n,i)=>n+Math.abs(i.a),0),done=items.filter(i=>i.d<=T).reduce((n,i)=>n+Math.abs(i.a),0);
+ const cashSpent=spent.filter(i=>kind(i)==='cash').reduce((n,i)=>n-i.a,0);
+ const cardSpent=spent.filter(i=>kind(i)==='card').reduce((n,i)=>n-i.a,0);
+ const payments=debtPaid.reduce((n,i)=>n-i.a,0);
+ const cats={};items.forEach(i=>{const c=guess(i);(cats[c]??=[]).push(i)});
+ const row=i=>`<div class="row tappable" data-e="${i.id}"><span><b>${esc(i.t)}</b><br><small>${dl(i.d)} · ${i.d>T?'Planlandı':'Tarihli kayıt'}${kind(i)==='card'?' · 💳 '+esc(dn(i.b)||'Kart seçilmemiş'):kind(i)==='debt'?' · Borç ödemesi':''}</small></span><b class="${inc?'pos':'neg'}">${sg(i.a)} ₺</b></div>`;
  const catHtml=Object.entries(cats).sort((a,b)=>b[1].reduce((n,i)=>n+Math.abs(i.a),0)-a[1].reduce((n,i)=>n+Math.abs(i.a),0)).map(([name,rows])=>`<details class="cat-card" open><summary><span>${esc(name)}<small>${rows.length} işlem</small></span><strong class="${inc?'pos':'neg'}">${f(rows.reduce((n,i)=>n+Math.abs(i.a),0))} ₺</strong></summary>${rows.map(row).join('')}</details>`).join('');
- return `<div class="page-head"><span class="home-eyebrow">PARA AKIŞI</span><h2>${inc?'Gelirler':'Giderler'}</h2><p>${inc?'Kazançlarını ve beklediğin ödemeleri takip et.':'Harcamalarını, yaklaşan ödemelerini ve borçlarını yönet.'}</p></div>${nav()}
- <div class="panel money-total"><small>${MN[mo-1]} ${y} · ${inc?'Toplam gelir':'Gerçek harcama (nakit + kart, borç ödemeleri hariç)'}</small><div class="big ${inc?'pos':'neg'}">${inc?'+':'−'}${f(total)} ₺</div><div class="money-split"><span>Bugüne kadar <b>${f(done)} ₺</b></span><span>İleride <b>${f(total-done)} ₺</b></span></div></div>
- ${!inc?`<div class="home-section-title">Borçlar <button id="debtMore">Yönet →</button></div><div class="panel debt-preview"><div><b>${st.debts.length} borç hesabı</b><small>Faiz ve ödeme planlarını görüntüle</small></div><button class="btn" id="debtOpen">Borçları aç →</button></div>`:''}
- <div class="home-section-title">${inc?'Gelir kaynakları':'Harcama kategorileri'}</div>${catHtml||'<div class="panel home-muted">Bu ay henüz kayıt yok.</div>'}
+ const payHtml=debtPaid.map(row).join('');
+ return `<div class="page-head"><span class="home-eyebrow">PARA AKIŞI</span><h2>${inc?'Gelirler':'Giderler'}</h2><p>${inc?'Kazançlarını ve beklediğin ödemeleri takip et.':'Alışverişi yaptığın ay gider yazılır; kart ekstresini ödediğin ay aynı harcama tekrar sayılmaz.'}</p></div>${nav()}
+ <div class="panel money-total"><small>${MN[mo-1]} ${y} · ${inc?'Toplam gelir':'Toplam harcama (nakit + kart)'}</small><div class="big ${inc?'pos':'neg'}">${inc?'+':'−'}${f(total)} ₺</div><div class="money-split"><span>Bugüne kadar tarihli <b>${f(done)} ₺</b></span><span>Gelecek tarihli <b>${f(total-done)} ₺</b></span></div>
+ ${!inc?'<div class="row" style="margin-top:10px"><span>💳 Kartla alışveriş</span><b>'+f(cardSpent)+' ₺</b></div><div class="row"><span>🏦 Nakit / banka ile alışveriş</span><b>'+f(cashSpent)+' ₺</b></div><div class="note">Kart ödemeleri yukarıdaki harcama toplamına dahil değildir.</div>':''}
+ </div>
+ ${!inc?`<div class="home-section-title">Borçlar <button id="debtMore">Yönet →</button></div><div class="panel debt-preview"><div><b>${st.debts.length} borç hesabı</b><small>Faiz ve ödeme planlarını görüntüle</small></div><button class="btn" id="debtOpen">Borçları aç →</button></div><button class="btn w" id="cardBackfill">💳 Geçmiş kart harcamalarını düzelt</button>`:''}
+ <div class="home-section-title">${inc?'Gelir kaynakları':'Alışveriş / gider kategorileri'}</div>${catHtml||'<div class="panel home-muted">Bu ay henüz kayıt yok.</div>'}
+ ${!inc?`<div class="home-section-title">Borç ve kredi kartı ödemeleri</div><div class="panel"><div class="row"><span>Bu ay ödenecek / ödenmiş</span><b>${f(payments)} ₺</b></div><p class="note">Bu para banka hesabından çıkar ama tekrar alışveriş harcaması sayılmaz.</p>${payHtml||'<p class="note">Bu ay borç ödemesi kaydı yok.</p>'}</div>`:''}
  <button class="btn p" id="moneyAdd">+ ${inc?'Gelir':'Gider'} ekle</button>`;
 }
 function changeView(v){view=v;render();window.scrollTo(0,0)}
@@ -355,6 +384,7 @@ m.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>changeView(el.dataset
 if($('moneyAdd'))$('moneyAdd').onclick=()=>form(null,tdy(),view==='income'?1:-1);
 if($('debtMore'))$('debtMore').onclick=()=>changeView('debt');
 if($('debtOpen'))$('debtOpen').onclick=()=>changeView('debt');
+if($('cardBackfill'))$('cardBackfill').onclick=cardHistorySheet;
 if($('welcomeStart'))$('welcomeStart').onclick=setSheet;
 if($('allDay'))$('allDay').onclick=()=>changeView('day');
 if($('allDay2'))$('allDay2').onclick=()=>changeView('day');
