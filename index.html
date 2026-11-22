@@ -101,9 +101,9 @@ const dn=id=>((st.debts.find(x=>x.id===id))||{}).n||'';
 const sg=a=>(a>0?'+':'−')+f(Math.abs(a));
 // İşlemin finansal niteliği harcama tarihi ile ödeme kaynağından ayrı tutulur.
 // Eski kayıtlarda borca bağlı negatif hareketler borç ödemesi sayılır.
-const kind=i=>i.m==='adjustment'?'adjustment':i.m==='card'?'card':i.m==='debt'?'debt':i.a>0?'income':i.b&&i.m!=='cash'?'debt':'cash';
+const kind=i=>i.m==='adjustment'?'adjustment':i.m==='transfer'?'transfer':i.m==='card'?'card':i.m==='debt'?'debt':i.a>0?'income':i.b&&i.m!=='cash'?'debt':'cash';
 const isUnconfirmedPlan=i=>kind(i)==='debt'&&!!i.autoDebt&&!i.paid&&i.d<=tdy();
-const cashDelta=i=>kind(i)==='card'||isUnconfirmedPlan(i)?0:i.a;
+const cashDelta=i=>kind(i)==='card'||kind(i)==='transfer'||isUnconfirmedPlan(i)?0:i.a;
 const spending=i=>kind(i)==='cash'||kind(i)==='card';
 const roundMoney=n=>Math.round((+n||0)*100)/100;
 // Kullanıcının geçmişte karttan ödendiğini doğruladığı tek kayıt: 13 Kasım 2026, X.
@@ -120,7 +120,7 @@ const close=()=>$('ov').classList.remove('on');
 function sheet(h,m){const o=$('ov');o.innerHTML='<div class="sh">'+h+'</div>';o.classList.add('on');o.onclick=e=>{if(e.target===o)close()};if(m)m(o.firstChild)}
 function toast(m){const t=$('ts');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),3000)}
 function dates(d,r,en){if(r==='0')return[d];const o=[];if(r==='w'){for(let x=d;x<=en;x=add(x,7))o.push(x)}else{const[y0,m0,dd]=d.split('-').map(Number);for(let k=0;;k++){const t=y0*12+m0-1+k,y=Math.floor(t/12),m=t%12+1,x=y+'-'+p2(m)+'-'+p2(Math.min(dd,dim(y,m)));if(x>en)break;o.push(x)}}return o.length?o:[d]}
-function hero(){const t=tdy(),future=st.items.filter(i=>i.d>t&&i.d<=E),futureOut=future.filter(i=>i.a<0&&kind(i)!=='card'&&kind(i)!=='adjustment').reduce((s,i)=>s-i.a,0),futureIn=future.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0);
+function hero(){const t=tdy(),future=st.items.filter(i=>i.d>t&&i.d<=E),futureOut=future.filter(i=>i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').reduce((s,i)=>s-i.a,0),futureIn=future.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0);
 const n=new Date(),todayLabel=n.getDate()+' '+MN[n.getMonth()]+' '+n.getFullYear();
 $('hero').innerHTML=`<div class="home-date">${todayLabel} · ${WF[n.getDay()]}</div><div class="hero"><div class="home-eyebrow">Bugünkü tahmini bakiyen</div><div class="big ${bal[t]<0?'neg':''}">${f(bal[t])} ₺</div><div class="home-muted">Kaydettiğin işlemlere göre. Gerçek paran farklı olabilir.</div><div class="home-summary"><div><span>Planlanan gelirler</span><b class="pos">+${f(futureIn)} ₺</b></div><div><span>Planlanan nakit çıkışı</span><b class="neg">−${f(futureOut)} ₺</b></div></div></div><div class="home-safe"><div><div class="home-eyebrow">Uzun vadeli tahmin</div><strong class="${bal[E]<0?'neg':''}">${f(bal[E])} ₺</strong><small>${dl(E)} sonuna kadarki planına göre</small></div><button class="btn" id="rbo">Eşitle ↗</button></div>`;
 $('rbo').onclick=realSheet}
@@ -129,32 +129,32 @@ $('bn').innerHTML=p&&view==='home'?`<div class="panel" style="border-color:var(-
 function nav(){const[y,m]=MS[mi].split('-').map(Number);return`<div class="nv"><button class="btn" id="bk1">‹</button><b>${MN[m-1]} ${y}</b><button class="btn" id="bk2">›</button><button class="btn" id="bt">Bugün</button></div>`}
 function dayView(){const[y,m]=MS[mi].split('-').map(Number),T=tdy();let h=`<div class="strip">Bugün cebinde <b class="${bal[T]<0?'neg':''}">${f(bal[T])} ₺</b></div>`+nav();
 for(let i=1;i<=dim(y,m);i++){const d=MS[mi]+'-'+p2(i);if(d<S||d>E)continue;const its=byd[d]||[],b=bal[d];
-h+=`<div class="dr${its.length?'':' q'}${d===T?' today':''}${d<T?' past':''}${b<0?' low':''}" data-d="${d}"><div class="dd"><b>${i}</b><small>${WD[D(d).getUTCDay()]}</small></div><div class="di">${its.map(x=>`<div class="it"><span>${kind(x)==='card'?'💳 ':kind(x)==='adjustment'?'≈ ':''}${esc(x.t)}</span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join('')}</div><div class="db ${b<0?'neg':''}">${f(b)}</div></div>`}
+h+=`<div class="dr${its.length?'':' q'}${d===T?' today':''}${d<T?' past':''}${b<0?' low':''}" data-d="${d}"><div class="dd"><b>${i}</b><small>${WD[D(d).getUTCDay()]}</small></div><div class="di">${its.map(x=>`<div class="it"><span>${kind(x)==='card'?'💳 ':kind(x)==='transfer'?'⇄ ':kind(x)==='adjustment'?'≈ ':''}${esc(x.t)}</span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join('')}</div><div class="db ${b<0?'neg':''}">${f(b)}</div></div>`}
 return h}
 function daySheet(d){const its=byd[d]||[];
-sheet(`<h3>${dl(d)} ${WF[D(d).getUTCDay()]}</h3><div class="note">Gün sonu bakiye: <b class="${bal[d]<0?'neg':''}">${f(bal[d])} ₺</b></div>`+(its.length?its.map(x=>`<div class="row" data-e="${x.id}"><span>${esc(x.t)}${x.g?' ↻':''}<br><small>${esc(guess(x))}${x.b?' · '+esc(dn(x.b)):''}${kind(x)==='card'?' · Kartla alındı (nakitten düşmez)':isUnconfirmedPlan(x)?' · Ödeme planlandı, henüz onaylanmadı':kind(x)==='debt'?' · Borç ödemesi':kind(x)==='adjustment'?' · Gelir/gider sayılmaz':''}</small></span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join(''):'<p class="note">Bu güne kayıt yok.</p>')+'<button class="btn p" id="ad">+ Bu güne ekle</button>',
+sheet(`<h3>${dl(d)} ${WF[D(d).getUTCDay()]}</h3><div class="note">Gün sonu bakiye: <b class="${bal[d]<0?'neg':''}">${f(bal[d])} ₺</b></div>`+(its.length?its.map(x=>`<div class="row" data-e="${x.id}"><span>${esc(x.t)}${x.g?' ↻':''}<br><small>${esc(guess(x))}${x.b?' · '+esc(dn(x.b)):''}${kind(x)==='card'?' · Kartla alındı (nakitten düşmez)':isUnconfirmedPlan(x)?' · Ödeme planlandı, henüz onaylanmadı':kind(x)==='debt'?' · Borç ödemesi':kind(x)==='transfer'?' · Kendi hesaplarım arası transfer':kind(x)==='adjustment'?' · Gelir/gider sayılmaz':''}</small></span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join(''):'<p class="note">Bu güne kayıt yok.</p>')+'<button class="btn p" id="ad">+ Bu güne ekle</button>',
 el=>{el.querySelectorAll('[data-e]').forEach(r=>r.onclick=()=>form(st.items.find(i=>i.id===r.dataset.e)));$('ad').onclick=()=>form(null,d)})}
 function done(dd){save();close();mi=Math.max(0,MS.indexOf(dd.slice(0,7)));render()}
 function form(e,d0,k0){let k=e?(e.a>0?1:-1):(k0||-1);const d=e?e.d:(d0||tdy());
 if(e&&e.m==='adjustment'){sheet('<h3>Nakit bakiye düzeltmesi</h3><p class="note">Bu kayıt gelir veya harcama değildir. Nakit bakiyeni gerçek tutara eşitlemek için eklenmiştir.</p><div class="row"><span>'+dl(e.d)+'</span><b>'+sg(e.a)+' ₺</b></div><button class="btn dz" id="fx">Düzeltmeyi sil</button>',()=>{$('fx').onclick=()=>{st.items=st.items.filter(i=>i!==e);done(e.d)}});return}
-const method=e?(e.m==='card'?'card':e.m==='debt'||(e.b&&e.m!=='cash')?'debt':'cash'):'cash';
+const method=e?(e.m==='card'?'card':e.m==='transfer'?'transfer':e.m==='debt'||(e.b&&e.m!=='cash')?'debt':'cash'):'cash';
 sheet(`<h3>${e?'Kaydı düzenle':'Yeni kayıt'}</h3><div class="seg"><button data-k="-1">Gider</button><button data-k="1">Gelir</button></div>
 <label>Tutar (₺)</label><input id="fa" type="number" inputmode="decimal" value="${e?Math.abs(e.a):''}">
 <label>Açıklama</label><input id="ft" value="${att(e?e.t:'')}" placeholder="örn. ders, KYK, market">
 <label>Kategori (kendin yaz)</label><input id="fc" value="${att(e?guess(e):'')}" placeholder="örn. özel ders, yemek">
 <label>Tarih</label><input id="fd" type="date" min="${S}" max="${E}" value="${d}">
 ${e?'':`<label>Tekrar</label><select id="fr"><option value="0">Tekrar yok</option><option value="w">Her hafta (aynı gün)</option><option value="m">Her ay (aynı tarih)</option></select><div id="fw" style="display:none"><label>Bitiş (boşsa dönem sonuna kadar)</label><input id="fe" type="date" min="${S}" max="${E}"></div>`}
-<div id="fmwrap"><label>Ödeme şekli</label><select id="fm"><option value="cash"${method==='cash'?' selected':''}>Nakit / banka hesabımdan</option><option value="card"${method==='card'?' selected':''}>Kredi kartıyla harcadım (nakit azalmaz)</option><option value="debt"${method==='debt'?' selected':''}>Borç / kart ödedim (nakit azalır)</option></select></div>
+<div id="fmwrap"><label>Ödeme şekli</label><select id="fm"><option value="cash"${method==='cash'?' selected':''}>Nakit / banka hesabımdan</option><option value="card"${method==='card'?' selected':''}>Kredi kartıyla harcadım (nakit azalmaz)</option><option value="debt"${method==='debt'?' selected':''}>Borç / kart ödedim (nakit azalır)</option><option value="transfer"${method==='transfer'?' selected':''}>Kendi banka hesaplarım arasında transfer (toplam para değişmez)</option></select></div>
 <div id="fbwrap"><label id="fbLabel">İlgili kredi kartı / borç</label><select id="fb"><option value="">Kart / borç seç</option>${st.debts.map(x=>`<option value="${x.id}"${e&&e.b===x.id?' selected':''}>${esc(x.n)}</option>`).join('')}</select></div>
 ${e&&e.g?'<label class="chk" style="margin-top:12px"><input id="fg" type="checkbox"> Bu ve sonraki tekrarlara da uygula</label>':''}
 ${e&&e.autoDebt?'<label class="chk"><input id="fpaid" type="checkbox"'+(e.paid?' checked':'')+'> Bu ödeme gerçekten yapıldı (bankadan kontrol ettim)</label>':''}<button class="btn p" id="fs">Kaydet</button>${e?'<button class="btn dz" id="fx">Sil</button>'+(e.g?'<button class="btn dz" id="fxs">Bunu ve sonrakileri sil</button>':''):''}`,
 el=>{const sgm=()=>el.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',+b.dataset.k===k));
-const syncType=()=>{$('fmwrap').style.display=k<0?'':'none';$('fbwrap').style.display=k<0&&$('fm').value!=='cash'?'':'none';$('fbLabel').textContent=$('fm').value==='card'?'Hangi kredi kartıyla harcadın?':'Hangi borcu / kartı ödedin?'};
+const syncType=()=>{$('fmwrap').style.display=k<0?'':'none';$('fbwrap').style.display=k<0&&!['cash','transfer'].includes($('fm').value)?'':'none';$('fbLabel').textContent=$('fm').value==='card'?'Hangi kredi kartıyla harcadın?':'Hangi borcu / kartı ödedin?'};
 sgm();syncType();$('fm').onchange=syncType;el.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{k=+b.dataset.k;sgm();syncType()});
 if($('fr'))$('fr').onchange=()=>{$('fw').style.display=$('fr').value==='0'?'none':'block'};
 $('fs').onclick=()=>{const v=+$('fa').value,dd=$('fd').value;if(!v||!dd||dd<S||dd>E){toast('Tutar ve tarih gerekli');return}
-const a=Math.abs(v)*k,t=$('ft').value.trim()||'Kayıt',c=$('fc').value.trim()||undefined,m=k>0?undefined:$('fm').value,b=k<0&&m!=='cash'?$('fb').value||undefined:undefined;
-if(k<0&&m!=='cash'&&!b){toast('İlgili kredi kartını / borcu seç');return}
+const a=Math.abs(v)*k,t=$('ft').value.trim()||'Kayıt',c=$('fc').value.trim()||undefined,m=k>0?undefined:$('fm').value,b=k<0&&!['cash','transfer'].includes(m)?$('fb').value||undefined:undefined;
+if(k<0&&!['cash','transfer'].includes(m)&&!b){toast('İlgili kredi kartını / borcu seç');return}
 if(e){const od=e.d;Object.assign(e,{d:dd,t,a,c,b,m});if(m!=='debt'){delete e.autoDebt;delete e.paid}else if(e.autoDebt&&$('fpaid'))e.paid=$('fpaid').checked;if(e.g&&$('fg')&&$('fg').checked)st.items.forEach(i=>{if(i.g===e.g&&i.d>od)Object.assign(i,{t,a,c,b,m})})}
 else{const r=$('fr').value,en=$('fe').value&&$('fe').value<E?$('fe').value:E,g=r==='0'?undefined:uid();dates(dd,r,en).forEach(x=>st.items.push({id:uid(),d:x,t,a,c,b,g,m}))}
 done(dd)};
@@ -350,6 +350,7 @@ function repView(){const m=MS[mi],[y,mo]=m.split('-').map(Number),z=m+'-'+p2(dim
 const inc={},exp={};let gi=0,ge=0,kd=0,kn=0,bd=0,cardSpent=0,cashSpent=0,adjustments=0;
 st.items.forEach(i=>{if(i.d<fs||i.d>fe)return;const c=guess(i),type=kind(i);
 if(type==='adjustment'){adjustments+=i.a;return}
+if(type==='transfer')return
 if(type==='income'){inc[c]=(inc[c]||0)+i.a;gi+=i.a}
 else if(type==='debt'){if(!isUnconfirmedPlan(i))bd-=i.a}
 else if(spending(i)){exp[c]=(exp[c]||0)-i.a;ge-=i.a;if(type==='card')cardSpent-=i.a;else cashSpent-=i.a;if(i.c==='Kayıt dışı'){kd-=i.a;kn++}}
@@ -363,7 +364,7 @@ return nav()+(z<=tdy()?'':'<p class="note">Bu ay henüz bitmedi, rakamların bir
 <div class="panel"><b>Gelirler</b>${L(inc)}</div><div class="panel"><b>Giderler</b>${L(exp)}</div>`}
 function homeView(){const T=tdy(),m=MS[mi],[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',z=m+'-'+p2(dim(y,mo)),fe=z>E?E:z;
 const monthly=st.items.filter(i=>i.d>=fs&&i.d<=fe),income=monthly.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0),expense=monthly.filter(spending).reduce((s,i)=>s-i.a,0);
-const upcoming=st.items.filter(i=>i.d>T&&i.d<=E&&i.a<0&&kind(i)!=='card'&&kind(i)!=='adjustment').sort((a,b)=>a.d.localeCompare(b.d)).slice(0,4);
+const upcoming=st.items.filter(i=>i.d>T&&i.d<=E&&i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').sort((a,b)=>a.d.localeCompare(b.d)).slice(0,4);
 const recent=st.items.filter(i=>i.d<=T&&i.d>=S).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,3);
 const itemIcon=i=>/kart|kredi|borç|avans/i.test(i.t)?'💳':/yurt|kira|ev/i.test(i.t)?'⌂':/yemek|market|kahve/i.test(i.t)?'◉':'↗';
 const payRow=i=>`<div class="home-pay" data-e="${i.id}"><div class="home-pay-icon">${itemIcon(i)}</div><div class="home-pay-info"><b>${esc(i.t)}</b><small>${dl(i.d)} · ${esc(guess(i))}</small></div><span class="home-pay-amount ${i.a<0?'neg':'pos'}">${sg(i.a)} ₺</span></div>`;
