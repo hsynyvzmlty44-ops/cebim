@@ -305,6 +305,25 @@ function debtReconcile(id){
 }
 
 function autopay(){toast('Mevcut ödemeler korunuyor. Her borçtaki Ödeme planı düğmesini kullan.');}
+function debtActivity(fs,fe){
+ const activity={interest:0,purchases:0,payments:0,reconcile:0};
+ st.debts.forEach(x=>{
+  let c=fs===S?Math.max(0,+x.p||0):debtBalanceAt(x,pv(fs));
+  for(let d=fs;d<=fe;d=nx(d)){
+   if(d>S&&d.slice(8)==='01'&&st.fz){const interest=c*(+x.r||0)/100;c+=interest;activity.interest+=interest}
+   (byd[d]||[]).forEach(i=>{
+    if(i.b!==x.id)return;
+    if(kind(i)==='card'&&i.a<0){c-=i.a;activity.purchases-=i.a}
+    else if(kind(i)==='debt'&&i.a<0){const p=Math.min(c,-i.a);c-=p;activity.payments+=p}
+   });
+   if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){
+    const corrected=Math.max(0,+x.reconciledBalance);
+    activity.reconcile+=corrected-c;c=corrected;
+   }
+  }
+ });
+ return Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,roundMoney(v)]));
+}
 function repView(){const m=MS[mi],[y,mo]=m.split('-').map(Number),z=m+'-'+p2(dim(y,mo)),fs=m+'-01'<S?S:m+'-01',fe=z>E?E:z;
 const inc={},exp={};let gi=0,ge=0,kd=0,kn=0,bd=0,cardSpent=0,cashSpent=0,adjustments=0;
 st.items.forEach(i=>{if(i.d<fs||i.d>fe)return;const c=guess(i),type=kind(i);
@@ -315,10 +334,10 @@ else if(spending(i)){exp[c]=(exp[c]||0)-i.a;ge-=i.a;if(type==='card')cardSpent-=
 });
 const op=fs===S?(+st.start||0):(bal[pv(fs)]||0),cl=bal[fe]||0;let ng=0;for(let d=fs;d<=fe;d=nx(d)){if(bal[d]<0)ng++}
 const RW=(l,v,c)=>`<div class="row"><span>${l}</span><b class="${c||''}">${f(v)} ₺</b></div>`,L=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,v])=>RW(esc(k),v)).join('')||'<p class="note">Kayıt yok</p>';
-const d0=debtRem(pv(fs)),d1=debtRem(fe);
+const d0=debtRem(pv(fs)),d1=debtRem(fe),activity=debtActivity(fs,fe);
 return nav()+(z<=tdy()?'':'<p class="note">Bu ay henüz bitmedi, rakamların bir kısmı plana göre.</p>')+`<div class="panel"><b>📋 ${MN[mo-1]} ${y} raporu</b><div class="note">${dl(fs)} – ${dl(fe)}</div>${RW('Açılış bakiyesi',op)}${RW('Toplam gelir',gi,'pos')}${RW('Gerçek harcamalar (nakit + kart)',ge,'neg')}${RW('Kartla yapılan harcama',cardSpent,'neg')}${RW('Nakit harcaması',cashSpent,'neg')}${RW('Borç ödemeleri (nakit çıkışı)',bd,'neg')}${adjustments?RW('Nakit bakiye düzeltmesi',adjustments,adjustments<0?'neg':'pos'):''}${RW('Kapanış bakiyesi',cl,cl<0?'neg':'')}${RW('Net değişim',cl-op,cl-op<0?'neg':'pos')}<div class="row"><span>Eksiye düştüğü gün</span><b>${ng}</b></div></div>
 <div class="panel" style="${kd?'border-color:var(--rd)':''}"><b>Kayıt dışı harcama</b>${kd?RW('Toplam ('+kn+' düzeltme)',kd,'neg'):'<p class="note">Bu ay kayıt dışı harcama yok ✓</p>'}</div>
-<div class="panel"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Bu ay ödenen',bd)}${RW('Eklenen faiz',Math.max(0,d1-d0+bd))}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div>
+<div class="panel"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Kartla yeni harcama',activity.purchases)}${RW('Eklenen tahmini faiz',activity.interest)}${RW('Bu ay borca ödenen',activity.payments)}${activity.reconcile?RW('Bankayla eşitleme farkı',activity.reconcile,activity.reconcile<0?'pos':'neg'):''}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div>
 <div class="panel"><b>Gelirler</b>${L(inc)}</div><div class="panel"><b>Giderler</b>${L(exp)}</div>`}
 function homeView(){const T=tdy(),m=MS[mi],[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',z=m+'-'+p2(dim(y,mo)),fe=z>E?E:z;
 const monthly=st.items.filter(i=>i.d>=fs&&i.d<=fe),income=monthly.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0),expense=monthly.filter(spending).reduce((s,i)=>s-i.a,0);
