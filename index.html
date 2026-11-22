@@ -202,27 +202,38 @@ $('dx').onclick=()=>{const linked=st.items.filter(i=>i.b===id);if(linked.length)
 
 /* Borç planlayıcı: varsayılan %20 asgari, %4 aylık tahmini faiz. */
 const debtDate=(y,m,day)=>y+'-'+p2(m)+'-'+p2(Math.min(day,new Date(y,m,0).getDate()));
-function debtSchedule(x, choices){
+function debtSchedule(x,choices){
+ // Borç paneli ve takvimle AYNI tarihsel faiz modelini kullanır:
+ // ayın 1'inde faiz, alışveriş tarihinde kart borcu, ödeme tarihinde nakit çıkışı.
  let c=debtBalanceAt(x,tdy()),out=[],now=new Date(tdy()+'T12:00:00');
  const day=Math.min(28,Math.max(1,+x.dueDay||6));
- let y=now.getFullYear(),m=now.getMonth()+1;
- if(debtDate(y,m,day)<tdy()){m++;if(m>12){m=1;y++}}
- const existing=st.items.filter(i=>i.b===x.id&&kind(i)==='debt'&&i.a<0&&i.d>tdy());
+ let y=now.getFullYear(),m=now.getMonth()+1,from=tdy();
+ if(debtDate(y,m,day)<=from){m++;if(m>12){m=1;y++}}
  for(let k=0;k<60&&c>0.005;k++){
-  const date=debtDate(y,m,day),opening=c;
-  const min=Math.round(Math.min(c,c*.2)*100)/100;
-  const manual=existing.filter(i=>i.d===date&&!i.autoDebt);
-  const automatic=existing.filter(i=>i.d===date&&i.autoDebt);
-  const recorded=manual.length?manual:automatic;
-  const recordedAmount=recorded.reduce((sum,i)=>sum-i.a,0);
+  const date=debtDate(y,m,day);
+  let interest=0,purchases=0,extraPayments=0;
+  for(let d=nx(from);d<=date;d=nx(d)){
+   if(d>S&&d.slice(8)==='01'&&st.fz){
+    const addInterest=roundMoney(c*(+x.r||0)/100);
+    c+=addInterest;interest+=addInterest;
+   }
+   (byd[d]||[]).forEach(i=>{
+    if(i.b!==x.id)return;
+    if(kind(i)==='card'&&i.a<0){c-=i.a;purchases-=i.a}
+    else if(kind(i)==='debt'&&i.a<0&&d!==date){
+     const amt=Math.min(c,-i.a);c-=amt;extraPayments+=amt;
+    }
+   });
+  }
+  const opening=roundMoney(c),min=roundMoney(Math.min(c,c*.2));
+  const recorded=st.items.filter(i=>i.b===x.id&&kind(i)==='debt'&&i.a<0&&i.d===date);
+  const manual=recorded.some(i=>!i.autoDebt),recordedAmount=recorded.reduce((sum,i)=>sum-i.a,0);
   const override=x.planOverrides&&x.planOverrides[date];
-  let desired=choices&&Object.prototype.hasOwnProperty.call(choices,date)?choices[date]:recorded.length?recordedAmount:override!==undefined?+override:min;
-  const pay=Math.min(c,Math.max(0,Math.round((+desired||0)*100)/100));
-  c=Math.max(0,c-pay);
-  const interest=c>0&&st.fz?Math.round(c*(+x.r||0)/100*100)/100:0;
-  c+=interest;
-  out.push({date,opening,min,pay,interest,closing:c,manual:manual.length>0,recorded:recordedAmount});
-  m++;if(m>12){m=1;y++}
+  const desired=choices&&Object.prototype.hasOwnProperty.call(choices,date)?choices[date]:recorded.length?recordedAmount:override!==undefined?+override:min;
+  const pay=Math.min(opening,Math.max(0,roundMoney(desired)));
+  c=roundMoney(Math.max(0,c-pay));
+  out.push({date,opening,min,pay,interest:roundMoney(interest),purchases:roundMoney(purchases),extraPayments:roundMoney(extraPayments),closing:c,manual,recorded:recordedAmount});
+  from=date;m++;if(m>12){m=1;y++}
  }
  return out;
 }
