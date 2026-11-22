@@ -102,7 +102,8 @@ const sg=a=>(a>0?'+':'−')+f(Math.abs(a));
 // İşlemin finansal niteliği harcama tarihi ile ödeme kaynağından ayrı tutulur.
 // Eski kayıtlarda borca bağlı negatif hareketler borç ödemesi sayılır.
 const kind=i=>i.m==='adjustment'?'adjustment':i.m==='card'?'card':i.m==='debt'?'debt':i.a>0?'income':i.b&&i.m!=='cash'?'debt':'cash';
-const cashDelta=i=>kind(i)==='card'?0:i.a;
+const isUnconfirmedPlan=i=>kind(i)==='debt'&&!!i.autoDebt&&!i.paid&&i.d<=tdy();
+const cashDelta=i=>kind(i)==='card'||isUnconfirmedPlan(i)?0:i.a;
 const spending=i=>kind(i)==='cash'||kind(i)==='card';
 const roundMoney=n=>Math.round((+n||0)*100)/100;
 // Kullanıcının geçmişte karttan ödendiğini doğruladığı tek kayıt: 13 Kasım 2026, X.
@@ -131,7 +132,7 @@ for(let i=1;i<=dim(y,m);i++){const d=MS[mi]+'-'+p2(i);if(d<S||d>E)continue;const
 h+=`<div class="dr${its.length?'':' q'}${d===T?' today':''}${d<T?' past':''}${b<0?' low':''}" data-d="${d}"><div class="dd"><b>${i}</b><small>${WD[D(d).getUTCDay()]}</small></div><div class="di">${its.map(x=>`<div class="it"><span>${kind(x)==='card'?'💳 ':kind(x)==='adjustment'?'≈ ':''}${esc(x.t)}</span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join('')}</div><div class="db ${b<0?'neg':''}">${f(b)}</div></div>`}
 return h}
 function daySheet(d){const its=byd[d]||[];
-sheet(`<h3>${dl(d)} ${WF[D(d).getUTCDay()]}</h3><div class="note">Gün sonu bakiye: <b class="${bal[d]<0?'neg':''}">${f(bal[d])} ₺</b></div>`+(its.length?its.map(x=>`<div class="row" data-e="${x.id}"><span>${esc(x.t)}${x.g?' ↻':''}<br><small>${esc(guess(x))}${x.b?' · '+esc(dn(x.b)):''}${kind(x)==='card'?' · Kartla alındı (nakitten düşmez)':kind(x)==='debt'?' · Borç ödemesi':kind(x)==='adjustment'?' · Gelir/gider sayılmaz':''}</small></span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join(''):'<p class="note">Bu güne kayıt yok.</p>')+'<button class="btn p" id="ad">+ Bu güne ekle</button>',
+sheet(`<h3>${dl(d)} ${WF[D(d).getUTCDay()]}</h3><div class="note">Gün sonu bakiye: <b class="${bal[d]<0?'neg':''}">${f(bal[d])} ₺</b></div>`+(its.length?its.map(x=>`<div class="row" data-e="${x.id}"><span>${esc(x.t)}${x.g?' ↻':''}<br><small>${esc(guess(x))}${x.b?' · '+esc(dn(x.b)):''}${kind(x)==='card'?' · Kartla alındı (nakitten düşmez)':isUnconfirmedPlan(x)?' · Ödeme planlandı, henüz onaylanmadı':kind(x)==='debt'?' · Borç ödemesi':kind(x)==='adjustment'?' · Gelir/gider sayılmaz':''}</small></span><b class="${x.a<0?'neg':'pos'}">${sg(x.a)}</b></div>`).join(''):'<p class="note">Bu güne kayıt yok.</p>')+'<button class="btn p" id="ad">+ Bu güne ekle</button>',
 el=>{el.querySelectorAll('[data-e]').forEach(r=>r.onclick=()=>form(st.items.find(i=>i.id===r.dataset.e)));$('ad').onclick=()=>form(null,d)})}
 function done(dd){save();close();mi=Math.max(0,MS.indexOf(dd.slice(0,7)));render()}
 function form(e,d0,k0){let k=e?(e.a>0?1:-1):(k0||-1);const d=e?e.d:(d0||tdy());
@@ -146,7 +147,7 @@ ${e?'':`<label>Tekrar</label><select id="fr"><option value="0">Tekrar yok</optio
 <div id="fmwrap"><label>Ödeme şekli</label><select id="fm"><option value="cash"${method==='cash'?' selected':''}>Nakit / banka hesabımdan</option><option value="card"${method==='card'?' selected':''}>Kredi kartıyla harcadım (nakit azalmaz)</option><option value="debt"${method==='debt'?' selected':''}>Borç / kart ödedim (nakit azalır)</option></select></div>
 <div id="fbwrap"><label id="fbLabel">İlgili kredi kartı / borç</label><select id="fb"><option value="">Kart / borç seç</option>${st.debts.map(x=>`<option value="${x.id}"${e&&e.b===x.id?' selected':''}>${esc(x.n)}</option>`).join('')}</select></div>
 ${e&&e.g?'<label class="chk" style="margin-top:12px"><input id="fg" type="checkbox"> Bu ve sonraki tekrarlara da uygula</label>':''}
-<button class="btn p" id="fs">Kaydet</button>${e?'<button class="btn dz" id="fx">Sil</button>'+(e.g?'<button class="btn dz" id="fxs">Bunu ve sonrakileri sil</button>':''):''}`,
+${e&&e.autoDebt?'<label class="chk"><input id="fpaid" type="checkbox"'+(e.paid?' checked':'')+'> Bu ödeme gerçekten yapıldı (bankadan kontrol ettim)</label>':''}<button class="btn p" id="fs">Kaydet</button>${e?'<button class="btn dz" id="fx">Sil</button>'+(e.g?'<button class="btn dz" id="fxs">Bunu ve sonrakileri sil</button>':''):''}`,
 el=>{const sgm=()=>el.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',+b.dataset.k===k));
 const syncType=()=>{$('fmwrap').style.display=k<0?'':'none';$('fbwrap').style.display=k<0&&$('fm').value!=='cash'?'':'none';$('fbLabel').textContent=$('fm').value==='card'?'Hangi kredi kartıyla harcadın?':'Hangi borcu / kartı ödedin?'};
 sgm();syncType();$('fm').onchange=syncType;el.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{k=+b.dataset.k;sgm();syncType()});
@@ -154,7 +155,7 @@ if($('fr'))$('fr').onchange=()=>{$('fw').style.display=$('fr').value==='0'?'none
 $('fs').onclick=()=>{const v=+$('fa').value,dd=$('fd').value;if(!v||!dd||dd<S||dd>E){toast('Tutar ve tarih gerekli');return}
 const a=Math.abs(v)*k,t=$('ft').value.trim()||'Kayıt',c=$('fc').value.trim()||undefined,m=k>0?undefined:$('fm').value,b=k<0&&m!=='cash'?$('fb').value||undefined:undefined;
 if(k<0&&m!=='cash'&&!b){toast('İlgili kredi kartını / borcu seç');return}
-if(e){const od=e.d;Object.assign(e,{d:dd,t,a,c,b,m});if(m!=='debt')delete e.autoDebt;if(e.g&&$('fg')&&$('fg').checked)st.items.forEach(i=>{if(i.g===e.g&&i.d>od)Object.assign(i,{t,a,c,b,m})})}
+if(e){const od=e.d;Object.assign(e,{d:dd,t,a,c,b,m});if(m!=='debt'){delete e.autoDebt;delete e.paid}else if(e.autoDebt&&$('fpaid'))e.paid=$('fpaid').checked;if(e.g&&$('fg')&&$('fg').checked)st.items.forEach(i=>{if(i.g===e.g&&i.d>od)Object.assign(i,{t,a,c,b,m})})}
 else{const r=$('fr').value,en=$('fe').value&&$('fe').value<E?$('fe').value:E,g=r==='0'?undefined:uid();dates(dd,r,en).forEach(x=>st.items.push({id:uid(),d:x,t,a,c,b,g,m}))}
 done(dd)};
 if(e){$('fx').onclick=()=>{st.items=st.items.filter(i=>i!==e);done(e.d)};if(e.g)$('fxs').onclick=()=>{st.items=st.items.filter(i=>!(i.g===e.g&&i.d>=e.d));done(e.d)}}})}
@@ -178,7 +179,7 @@ function afterReconcileItems(x,d){
 }
 function applyDebtEntry(c,i){
  if(kind(i)==='card'&&i.a<0)return c-i.a;
- if(kind(i)==='debt'&&i.a<0)return Math.max(0,c+i.a);
+ if(kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i))return Math.max(0,c+i.a);
  return c;
 }
 function debtBalanceAt(x,upto){
@@ -186,7 +187,7 @@ function debtBalanceAt(x,upto){
  for(let d=S;d<=upto;d=nx(d)){
   // Banka eşitlemesi o günün tüm geçmiş hareketlerinden SONRA geçerlidir.
   if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||0)/100;
-  (byd[d]||[]).forEach(i=>{if(i.b!==x.id||i.a>=0)return;if(kind(i)==='card')c-=i.a;else if(kind(i)==='debt')c=Math.max(0,c+i.a)});
+  (byd[d]||[]).forEach(i=>{if(i.b!==x.id||i.a>=0||isUnconfirmedPlan(i))return;if(kind(i)==='card')c-=i.a;else if(kind(i)==='debt')c=Math.max(0,c+i.a)});
   if(cut===d&&anchor!==null){c=anchor;afterReconcileItems(x,d).forEach(i=>{c=applyDebtEntry(c,i)})}
  }
  return c;
@@ -197,7 +198,7 @@ function debtView(){
  Dd.forEach(x=>A[x.id]={c:Math.max(0,+x.p||0),pd:0,pa:0,ia:0,rt:0,end:null});
  for(let d=S;d<=E;d=nx(d)){
   if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*(+x.r||0)/100;a.c+=q;a.ia+=q});
-  (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0){if(kind(i)==='card')a.c-=i.a;else if(kind(i)==='debt'){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}}});
+  (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0&&!isUnconfirmedPlan(i)){if(kind(i)==='card')a.c-=i.a;else if(kind(i)==='debt'){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}}});
   Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){a.c=Math.max(0,+x.reconciledBalance);afterReconcileItems(x,d).forEach(i=>{a.c=applyDebtEntry(a.c,i)})}if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
  }
  const sm=k=>Dd.reduce((sum,x)=>sum+(k==='p'?(+x.p||0):A[x.id][k]),0);
@@ -228,7 +229,7 @@ function debtSchedule(x,choices){
     c+=addInterest;interest+=addInterest;
    }
    (byd[d]||[]).forEach(i=>{
-    if(i.b!==x.id)return;
+    if(i.b!==x.id||isUnconfirmedPlan(i))return;
     if(kind(i)==='card'&&i.a<0){c-=i.a;purchases-=i.a}
     else if(kind(i)==='debt'&&i.a<0&&d!==date){
      const amt=Math.min(c,-i.a);c-=amt;extraPayments+=amt;
@@ -350,7 +351,7 @@ const inc={},exp={};let gi=0,ge=0,kd=0,kn=0,bd=0,cardSpent=0,cashSpent=0,adjustm
 st.items.forEach(i=>{if(i.d<fs||i.d>fe)return;const c=guess(i),type=kind(i);
 if(type==='adjustment'){adjustments+=i.a;return}
 if(type==='income'){inc[c]=(inc[c]||0)+i.a;gi+=i.a}
-else if(type==='debt'){bd-=i.a}
+else if(type==='debt'){if(!isUnconfirmedPlan(i))bd-=i.a}
 else if(spending(i)){exp[c]=(exp[c]||0)-i.a;ge-=i.a;if(type==='card')cardSpent-=i.a;else cashSpent-=i.a;if(i.c==='Kayıt dışı'){kd-=i.a;kn++}}
 });
 const op=fs===S?(+st.start||0):(bal[pv(fs)]||0),cl=bal[fe]||0;let ng=0;for(let d=fs;d<=fe;d=nx(d)){if(bal[d]<0)ng++}
@@ -391,7 +392,8 @@ function moneyPage(page){
  const inc=page==='income',m=MS[mi],T=tdy(),[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',fe=m+'-'+p2(dim(y,mo))>E?E:m+'-'+p2(dim(y,mo));
  const month=st.items.filter(i=>i.d>=fs&&i.d<=fe);
  const spent=month.filter(i=>spending(i)&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
- const debtPaid=month.filter(i=>kind(i)==='debt'&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
+ const debtPaid=month.filter(i=>kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i)).sort((a,b)=>a.d.localeCompare(b.d));
+ const pendingDebt=month.filter(isUnconfirmedPlan).sort((a,b)=>a.d.localeCompare(b.d));
  const incomes=month.filter(i=>kind(i)==='income').sort((a,b)=>a.d.localeCompare(b.d));
  const items=inc?incomes:spent;
  const total=items.reduce((n,i)=>n+Math.abs(i.a),0),done=items.filter(i=>i.d<=T).reduce((n,i)=>n+Math.abs(i.a),0);
@@ -408,7 +410,7 @@ function moneyPage(page){
  </div>
  ${!inc?`<div class="home-section-title">Borçlar <button id="debtMore">Yönet →</button></div><div class="panel debt-preview"><div><b>${st.debts.length} borç hesabı</b><small>Faiz ve ödeme planlarını görüntüle</small></div><button class="btn" id="debtOpen">Borçları aç →</button></div><button class="btn w" id="cardBackfill">💳 Geçmiş kart harcamalarını düzelt</button>`:''}
  <div class="home-section-title">${inc?'Gelir kaynakları':'Alışveriş / gider kategorileri'}</div>${catHtml||'<div class="panel home-muted">Bu ay henüz kayıt yok.</div>'}
- ${!inc?`<div class="home-section-title">Borç ve kredi kartı ödemeleri</div><div class="panel"><div class="row"><span>Bu ay ödenecek / ödenmiş</span><b>${f(payments)} ₺</b></div><p class="note">Bu para banka hesabından çıkar ama tekrar alışveriş harcaması sayılmaz.</p>${payHtml||'<p class="note">Bu ay borç ödemesi kaydı yok.</p>'}</div>`:''}
+ ${!inc?`<div class="home-section-title">Borç ve kredi kartı ödemeleri</div><div class="panel"><div class="row"><span>Bu ay planlanan / kaydedilen borç ödemeleri</span><b>${f(payments)} ₺</b></div><p class="note">Bu para banka hesabından çıkar ama tekrar alışveriş harcaması sayılmaz.</p>${payHtml||'<p class="note">Bu ay borç ödemesi kaydı yok.</p>'}</div>${pendingDebt.length?'<div class="panel" style="border-color:var(--rd)"><b>Onay bekleyen kart ödemeleri</b><p class="note">Ödeme tarihi geçti ama bankadan gerçekleştiğini işaretlemedin. Borçtan ve nakit bakiyenden düşülmedi. Kayda bas, «Ödeme gerçekten yapıldı» kutusunu işaretle.</p>'+pendingDebt.map(row).join('')+'</div>':''}`:''}
  <button class="btn p" id="moneyAdd">+ ${inc?'Gelir':'Gider'} ekle</button>`;
 }
 function changeView(v){view=v;render();window.scrollTo(0,0)}
