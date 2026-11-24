@@ -85,12 +85,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,san
 .home-safe{border-left:4px solid #328776}
 button:focus-visible,summary:focus-visible{outline:3px solid #328776;outline-offset:2px}
 .month-ledger summary{cursor:pointer;font-weight:600;padding:10px 0}
+
+.header-tools,.tools-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tools-head h2,.tools-head h3{font-size:1.15rem;margin:0}
+.header-tools .btn,.tools-head .btn{font-size:.88rem;min-height:42px}
+.outlook-low{display:grid;gap:2px;margin-top:14px}
+.outlook-low small,.list-entry small{color:var(--mu)}
+.outlook-low strong{font-size:1.65rem;font-variant-numeric:tabular-nums}
+.outlook details{border-top:1px solid var(--bd);padding-top:10px}
+.outlook summary{cursor:pointer;font-weight:600}
+.list-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:11px 0;border:0;border-bottom:1px solid var(--bd);background:transparent;color:var(--tx);text-align:left;font:inherit;cursor:pointer}
+.list-entry:last-child{border:0}.list-entry span{min-width:0;overflow-wrap:anywhere}
+.list-entry small{display:block;font-size:.8rem;margin-top:4px}.list-entry strong{white-space:nowrap}
+.search-filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}.search-filters label{min-width:0}.search-filters select{font-size:1rem;margin-top:4px}
+#query,#trialAmount{font-size:1rem}
+
+.cash-edit{color:#fff;background:transparent;border:1px solid #ffffff65;border-radius:12px;padding:8px 14px;min-height:40px;cursor:pointer;font:inherit}
+.pending-link{display:block;width:100%;text-align:left;color:var(--tx);background:var(--bg);border:0;border-radius:10px;padding:10px 12px;font:inherit;margin-bottom:12px;cursor:pointer}
+.pending-link small{display:block;color:var(--mu);margin-top:2px}
 </style></head><body>
-<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><button class="ic" id="gs" aria-label="Ayarlar ve yedek">⚙︎</button></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
+<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><div class="header-tools"><button class="btn" id="searchAll">İşlem ara</button><button class="ic" id="gs" aria-label="Ayarlar ve yedek">⚙︎</button></div></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
 <nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button id="fab" aria-label="Yeni kayıt">+</button><button data-v="expense">Giderler</button><button data-v="day">Takvim</button></nav>
 <p class="note" id="offlineState" style="text-align:center" role="status"></p><div id="ov"></div><div id="ts"></div>
 <script>
-const S='2026-10-12',E='2031-12-31',APP_VERSION='24.11.2026 · Çevrimdışı bütçe';
+const S='2026-10-12',E='2031-12-31',APP_VERSION='24.11.2026 · Bakiye tahmini ve işlem arama';
 const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],WD=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],WF=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const $=id=>document.getElementById(id),p2=n=>String(n).padStart(2,'0'),uid=()=>Math.random().toString(36).slice(2,9);
 const D=s=>new Date(s+'T00:00:00Z'),add=(d,n)=>{const t=D(d);t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},nx=d=>add(d,1),pv=d=>add(d,-1);
@@ -139,7 +157,7 @@ function toast(m){const t=$('ts');t.textContent=m;t.classList.add('on');setTimeo
 function dates(d,r,en){if(r==='0')return[d];const o=[];if(r==='w'){for(let x=d;x<=en;x=add(x,7))o.push(x)}else{const[y0,m0,dd]=d.split('-').map(Number);for(let k=0;;k++){const t=y0*12+m0-1+k,y=Math.floor(t/12),m=t%12+1,x=y+'-'+p2(m)+'-'+p2(Math.min(dd,dim(y,m)));if(x>en)break;o.push(x)}}return o.length?o:[d]}
 function hero(){const t=tdy(),monthEnd=t.slice(0,8)+dim(+t.slice(0,4),+t.slice(5,7)),future=st.items.filter(i=>i.d>t&&i.d<=monthEnd),futureOut=future.filter(i=>i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').reduce((s,i)=>s-i.a,0),futureIn=future.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0);
 const n=new Date(),todayLabel=n.getDate()+' '+MN[n.getMonth()]+' '+n.getFullYear();
-$('hero').innerHTML=`<div class="home-date">${todayLabel} · ${WF[n.getDay()]}</div><div class="hero"><div class="home-eyebrow">Bugün cebimde</div><div class="big ${bal[t]<0?'neg':''}">${f(bal[t])} ₺</div><div class="home-muted">Kaydettiğin işlemlere göre. Gerçek paran farklı olabilir.</div><div class="home-summary"><div><span>Ay sonuna kadar gelir</span><b class="pos">+${f(futureIn)} ₺</b></div><div><span>Ay sonuna kadar ödenecek</span><b class="neg">−${f(futureOut)} ₺</b></div></div></div><div class="home-safe"><div><div class="home-eyebrow">Ay sonunda tahmini kalan</div><strong class="${bal[monthEnd]<0?'neg':''}">${f(bal[monthEnd])} ₺</strong><small>${dl(monthEnd)} için kayıtlı plana göre</small></div><button class="btn" id="rbo">Eşitle ↗</button></div>`;
+$('hero').innerHTML=`<div class="home-date">${todayLabel} · ${WF[n.getDay()]}</div><div class="hero"><div class="tools-head"><div class="home-eyebrow">Bugün cebimde</div><button class="cash-edit" id="rbo">Eşitle</button></div><div class="big ${bal[t]<0?'neg':''}">${f(bal[t])} ₺</div><div class="home-muted">Kaydettiğin işlemlere göre. Gerçek paran farklı olabilir.</div><div class="home-summary"><div><span>Ay sonuna kadar gelir</span><b class="pos">+${f(futureIn)} ₺</b></div><div><span>Ay sonuna kadar ödenecek</span><b class="neg">−${f(futureOut)} ₺</b></div></div></div><div class="home-safe"><div><div class="home-eyebrow">Ay sonunda tahmini kalan</div><strong class="${bal[monthEnd]<0?'neg':''}">${f(bal[monthEnd])} ₺</strong><small>${dl(monthEnd)} için kayıtlı plana göre</small></div></div>`;
 $('rbo').onclick=realSheet}
 function banner(){const t=tdy();let p=null;MS.forEach(m=>{const[y,mo]=m.split('-').map(Number),z=m+'-'+p2(dim(y,mo));if(z<=t&&z<=E&&!st.seen.includes(m))p=m});
 $('bn').innerHTML=p&&view==='home'?`<div class="panel" style="border-color:var(--ac)"><b>📋 ${MN[+p.slice(5)-1]} ayı raporu hazır</b> <button class="btn" id="bg" style="margin-left:8px">Gör</button></div>`:'';if($('bg'))$('bg').onclick=()=>{mi=MS.indexOf(p);view='rep';render()}}
@@ -390,15 +408,131 @@ return nav()+(z<=tdy()?'':'<p class="note">Bu ay henüz bitmedi, rakamların bir
 <p class="note">Toplam aylık gider, kartla yapılan alışverişi ve karta yapılan ödemeyi ayrı hareketler olarak sayar. Aynı alışveriş farklı aylarda iki kez görünebilir. Tekil tüketim için alışveriş toplamına bak.</p><div class="panel" style="${kd?'border-color:var(--rd)':''}"><b>Kayıt dışı harcama</b>${kd?RW('Toplam ('+kn+' düzeltme)',kd,'neg'):'<p class="note">Bu ay kayıt dışı harcama yok ✓</p>'}</div>
 <div class="panel"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Kartla yeni harcama',activity.purchases)}${RW('Eklenen tahmini faiz',activity.interest)}${RW('Dönemin borç ödemeleri (plan dahil)',activity.payments)}${activity.reconcile?RW('Bankayla eşitleme farkı',activity.reconcile,activity.reconcile<0?'pos':'neg'):''}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div>
 <div class="panel"><b>Gelirler</b>${L(inc)}</div><div class="panel"><b>Giderler</b>${L(exp)}</div>`}
+const fullDay = d => dl(d)+' '+d.slice(0,4);
+
+function cashOutlook(today) {
+ const nextIncome = st.items.reduce((soonest, item) => {
+  if (kind(item)!=='income' || item.d<=today || item.d>E) return soonest;
+  return !soonest || item.d<soonest ? item.d : soonest;
+ }, '');
+ const monthEnd = today.slice(0,8)+dim(+today.slice(0,4),+today.slice(5,7));
+ const end = nextIncome ? pv(nextIncome) : monthEnd;
+ let lowestDay=today, firstNegative='';
+ const changes=[];
+ for (let date=today; date<=end; date=nx(date)) {
+  const amount=roundMoney(bal[date]);
+  if (amount<roundMoney(bal[lowestDay])) lowestDay=date;
+  if (amount<0 && !firstNegative) firstNegative=date;
+  if (date===today || amount!==roundMoney(bal[pv(date)])) changes.push(date);
+ }
+ return {today,end,nextIncome,lowestDay,firstNegative,changes};
+}
+
+function outlookPanel(plan) {
+ const low=roundMoney(bal[plan.lowestDay]);
+ const pending=st.items.filter(isUnconfirmedPlan);
+ const title=plan.nextIncome?'Sonraki gelire kadar':'Ay sonuna kadar';
+ const horizon=plan.nextIncome?'Sonraki gelir '+fullDay(plan.nextIncome):'Kayıtlı gelecek gelir yok';
+ return `<section class="panel outlook">
+  <div class="tools-head"><h2>${title}</h2><button class="btn" id="simulate">Harcama dene</button></div>
+  <div class="outlook-low"><small>En düşük tahmini bakiye</small><strong class="${low<0?'neg':''}">${f(low)} ₺</strong></div>
+  <p class="home-muted">${plan.firstNegative?fullDay(plan.firstNegative)+' günü bakiye eksiye düşüyor. ':''}${horizon}.</p>
+  ${pending.length?`<button class="pending-link" id="pendingReview">${pending.length} ödeme onay bekliyor · ${f(pending.reduce((sum,i)=>sum-i.a,0))} ₺<small>Bakiye tahminine henüz dahil edilmedi</small></button>`:''}
+  <details><summary>Günlük bakiye değişimi</summary>
+  <div class="note">Bugünden ${fullDay(plan.end)} gün sonuna kadar</div>
+  ${plan.changes.map(d=>`<button class="list-entry" data-d="${d}"><span>${d===plan.today?'Bugün':fullDay(d)}</span><b>${f(bal[d])} ₺</b></button>`).join('')}
+  </details></section>`;
+}
+
+function simulateExpense() {
+ const plan=cashOutlook(tdy());
+ sheet(`<div class="tools-head"><h3>Bugün harcarsam</h3><button class="btn" id="endTrial">Kapat</button></div>
+ <label for="trialAmount">Nakit veya banka hesabından harcama (₺)</label>
+ <input id="trialAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00">
+ <p class="home-muted">Bugünden ${fullDay(plan.end)} gün sonuna kadar kayıtlı planına göre hesaplanır. Deneme tutarı kayda eklenmez.</p>
+ <div aria-live="polite" id="trialResult"></div>`,()=>{
+  const update=()=>{
+   const value=$('trialAmount').valueAsNumber;
+   if ($('trialAmount').validity.badInput || $('trialAmount').value && (!Number.isFinite(value)||value<0)) {
+    $('trialResult').textContent='Sıfır veya pozitif bir tutar gir.';return;
+   }
+   const amount=roundMoney(value||0);
+   const first=plan.changes.find(d=>roundMoney(bal[d]-amount)<0);
+   $('trialResult').innerHTML=`<div class="row"><span>Bugün kalacak</span><b>${f(bal[plan.today]-amount)} ₺</b></div>
+   <div class="row"><span>En düşük bakiye<br><small>${fullDay(plan.lowestDay)}</small></span><b>${f(bal[plan.lowestDay]-amount)} ₺</b></div>
+   <p class="${first?'neg':'home-muted'}">${first?fullDay(first)+' günü '+f(amount-bal[first])+' ₺ açık oluşur.':'Bu dönemde bakiye eksiye düşmüyor.'}</p>`;
+  };
+  $('endTrial').onclick=close;
+  $('trialAmount').oninput=update;update();
+ });
+}
+
+const methodNames={cash:'Nakit / banka harcaması',card:'Kartla alışveriş',debt:'Borç ödemesi',income:'Gelir',transfer:'Transfer',adjustment:'Bakiye düzeltmesi'};
+const searchState={query:'',period:'past',method:'',limit:40};
+const foldSearch=value=>String(value??'').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replaceAll('ı','i');
+
+function matchingItems(state,today) {
+ const terms=foldSearch(state.query).trim().split(/\s+/).filter(Boolean);
+ return st.items.filter(i=>{
+  if (state.period==='past' && i.d>today || state.period==='future' && i.d<=today) return false;
+  const method=kind(i);
+  if (state.period==='pending' && !isUnconfirmedPlan(i)) return false;
+  if (state.method && method!==state.method) return false;
+  const searchText=foldSearch([i.t,guess(i),dn(i.b),methodNames[method],i.d,fullDay(i.d),f(Math.abs(i.a)),String(Math.abs(i.a)).replace('.',','),Math.abs(i.a)].join(' '));
+  return terms.every(term=>searchText.includes(term));
+ }).sort((a,b)=>state.period==='future'?a.d.localeCompare(b.d):b.d.localeCompare(a.d));
+}
+
+function searchPage() {
+ return `<div class="tools-head"><h2>İşlem ara</h2><button id="exitSearch" class="btn">Geri</button></div>
+ <div class="panel"><label for="query">Açıklama, kategori, kart veya tutar</label>
+ <input id="query" type="search" value="${att(searchState.query)}" placeholder="Örn. market veya 1.500">
+ <div class="search-filters"><label>Dönem<select id="period"><option value="past">Bugün ve geçmiş</option><option value="future">Gelecek</option><option value="all">Tüm tarihler</option><option value="pending">Onay bekleyen</option></select></label>
+ <label>İşlem türü<select id="method"><option value="">Tümü</option>${Object.entries(methodNames).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label></div></div>
+ <p id="matchCount" role="status" class="home-muted"></p><div id="matches"></div>`;
+}
+
+function bindSearch() {
+ const results=$('matches');
+ function show() {
+  const matches=matchingItems(searchState,tdy());
+  $('matchCount').textContent=matches.length?matches.length+' işlem bulundu.':'Bu seçimle eşleşen işlem yok.';
+  const rows=matches.slice(0,searchState.limit).map(i=>`<button class="list-entry" data-match="${att(i.id)}">
+   <span><b>${esc(i.t)}</b><small>${fullDay(i.d)} · ${methodNames[kind(i)]}${isUnconfirmedPlan(i)?' · Onay bekliyor':''}</small></span>
+   <strong class="${i.a<0?'neg':'pos'}">${sg(i.a)} ₺</strong></button>`);
+  results.innerHTML=(rows.length?'<div class="panel">'+rows.join('')+'</div>':'')+
+    (matches.length>rows.length?'<button class="btn w" id="moreMatches">Daha fazla göster</button>':'');
+  if($('moreMatches'))$('moreMatches').onclick=()=>{searchState.limit+=40;show()};
+ }
+ results.onclick=e=>{
+  const button=e.target.closest('[data-match]');
+  if(button)form(st.items.find(i=>i.id===button.dataset.match));
+ };
+ for(const key of ['query','period','method']){
+  const input=$(key);
+  input.value=searchState[key];
+  input.addEventListener(key==='query'?'input':'change',()=>{
+   searchState[key]=input.value;searchState.limit=40;show();
+  });
+ }
+ $('exitSearch').onclick=()=>{mi=searchOrigin.month;changeView(searchOrigin.view)};
+ show();
+}
+let searchOrigin={view:'home',month:curMi()};
+function openSearch(){
+ if(view!=='search')searchOrigin={view,month:mi};
+ changeView('search');$('query').focus();
+}
+
 function homeView(){const T=tdy(),m=MS[mi],[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',z=m+'-'+p2(dim(y,mo)),fe=z>E?E:z;
 const monthly=st.items.filter(i=>i.d>=fs&&i.d<=fe),income=monthly.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0),expense=sumOutgo(monthly),purchases=monthly.filter(i=>spending(i)&&i.a<0).reduce((s,i)=>s-i.a,0),debtPayments=monthly.filter(i=>kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i)).reduce((s,i)=>s-i.a,0);
 const upcoming=st.items.filter(i=>i.d>T&&i.d<=E&&i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').sort((a,b)=>a.d.localeCompare(b.d)).slice(0,4);
 const recent=st.items.filter(i=>i.d<=T&&i.d>=S).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,3);
 const itemIcon=i=>/kart|kredi|borç|avans/i.test(i.t)?'💳':/yurt|kira|ev/i.test(i.t)?'⌂':/yemek|market|kahve/i.test(i.t)?'◉':'↗';
 const payRow=i=>`<div class="home-pay" data-e="${i.id}"><div class="home-pay-icon">${itemIcon(i)}</div><div class="home-pay-info"><b>${esc(i.t)}</b><small>${dl(i.d)} · ${esc(guess(i))}</small></div><span class="home-pay-amount ${i.a<0?'neg':'pos'}">${sg(i.a)} ₺</span></div>`;
-return `${st.items.length===0?`<div class="panel" style="padding:20px;border:1px solid var(--bd)"><b style="font-size:18px">Cebim'e hoş geldin</b><p class="home-muted">Önce başlangıç paranı ayarlardan gir, sonra gelir ve giderlerini ekle. Verilerin bu cihazda saklanır.</p><button class="btn p" id="welcomeStart">Başlangıç bakiyemi ayarla</button></div>`:''}<div class="home-section-title">Yaklaşan ödemeler <button id="allDay">Takvimi gör →</button></div><div class="panel">${upcoming.length?upcoming.map(payRow).join(''):'<div class="home-muted">Planlanan yaklaşan ödeme bulunmuyor.</div>'}</div>
+return `${st.items.length===0?`<div class="panel" style="padding:20px;border:1px solid var(--bd)"><b style="font-size:18px">Cebim'e hoş geldin</b><p class="home-muted">Önce başlangıç paranı ayarlardan gir, sonra gelir ve giderlerini ekle. Verilerin bu cihazda saklanır.</p><button class="btn p" id="welcomeStart">Başlangıç bakiyemi ayarla</button></div>`:''}${st.items.length||st.start?outlookPanel(cashOutlook(T)):''}<div class="home-section-title">Yaklaşan ödemeler <button id="allDay">Takvimi gör →</button></div><div class="panel">${upcoming.length?upcoming.map(payRow).join(''):'<div class="home-muted">Planlanan yaklaşan ödeme bulunmuyor.</div>'}</div>
 <div class="home-section-title">Bu ay <button id="allRep">Detaylı rapor →</button></div><div class="panel"><div class="home-eyebrow">${MN[mo-1]} ${y} · Aylık özet</div><div class="home-month"><div class="jump" data-go="income"><small>Gelirler ↗</small><b class="pos">+${f(income)} ₺</b></div><div class="jump" data-go="expense"><small>Giderler ↗</small><b class="neg">−${f(expense)} ₺</b></div></div><div class="home-foot">Giderler: ${f(purchases)} ₺ alışveriş + ${f(debtPayments)} ₺ kart/borç ödemesi. Ödemeler, önceki alışverişlerle çakışabilir. Gerçekleşen ve geleceğe planlanan işlemler birlikte gösterilir.</div></div>
-<div class="home-section-title">Son kayıtlar <button id="allDay2">Tümünü gör →</button></div><div class="panel">${recent.length?recent.map(payRow).join(''):'<div class="home-muted">Henüz işlem bulunmuyor. Alttaki + düğmesinden ekleyebilirsin.</div>'}</div>`}
+<div class="home-section-title">Son kayıtlar <button id="allDay2">İşlem ara</button></div><div class="panel">${recent.length?recent.map(payRow).join(''):'<div class="home-muted">Henüz işlem bulunmuyor. Alttaki + düğmesinden ekleyebilirsin.</div>'}</div>`}
 function cardHistorySheet(){
  const cards=st.debts.filter(x=>/kart/i.test(x.n)&&!/avans/i.test(x.n));
  if(!cards.length){toast('Önce bir kredi kartı borcu eklemelisin');return}
@@ -455,7 +589,7 @@ function changeView(v){view=v;render();window.scrollTo(0,0)}
 function render(){if(view==='home')mi=curMi();document.getElementById("preview-warning")?.remove();build();hero();banner();
 document.querySelectorAll('#tb [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
 $('hero').style.display=view==='home'?'block':'none';
-const m=$('main');m.innerHTML=view==='home'?homeView():view==='income'?moneyPage('income'):view==='expense'?moneyPage('expense'):view==='day'?dayView():view==='debt'?debtView():repView();
+const m=$('main');m.innerHTML=view==='home'?homeView():view==='income'?moneyPage('income'):view==='expense'?moneyPage('expense'):view==='day'?dayView():view==='debt'?debtView():view==='search'?searchPage():repView();
 if($('bk1')){$('bk1').onclick=()=>{if(mi>0){mi--;render()}};$('bk2').onclick=()=>{if(mi<MS.length-1){mi++;render()}};$('bt').onclick=()=>{mi=curMi();render()}}
 m.querySelectorAll('[data-d]').forEach(r=>r.onclick=()=>daySheet(r.dataset.d));
 m.querySelectorAll('[data-e]').forEach(r=>r.onclick=()=>form(st.items.find(i=>i.id===r.dataset.e)));
@@ -468,7 +602,13 @@ if($('cardBackfill'))$('cardBackfill').onclick=cardHistorySheet;
 if($('cardPaymentAdd'))$('cardPaymentAdd').onclick=()=>form(null,tdy(),-1,'debt');
 if($('welcomeStart'))$('welcomeStart').onclick=setSheet;
 if($('allDay'))$('allDay').onclick=()=>changeView('day');
-if($('allDay2'))$('allDay2').onclick=()=>changeView('day');
+if($('allDay2'))$('allDay2').onclick=()=>{Object.assign(searchState,{query:'',method:'',period:'past',limit:40});openSearch()};
+if($('pendingReview'))$('pendingReview').onclick=()=>{
+ Object.assign(searchState,{query:'',method:'',period:'pending',limit:40});
+ openSearch();
+};
+if($('simulate'))$('simulate').onclick=simulateExpense;
+if(view==='search')bindSearch();
 if($('allRep'))$('allRep').onclick=()=>changeView('rep');
 if($('ha'))$('ha').onclick=()=>{const q=MS[mi]===tdy().slice(0,7)?tdy():(MS[mi]+'-01'<S?S:MS[mi]+'-01');form(null,q,hk)};
 if(view==='day'&&!window.__sc){const r=m.querySelector('.today');if(r){window.__sc=1;r.scrollIntoView({block:'start'})}}
@@ -477,7 +617,7 @@ $('nd').onclick=()=>{const id=uid();st.debts.push({id,n:'Yeni borç',p:0,r:4,due
 /* kaldırılan eski otomatik ödeme düğmesi */}
 if(view==='rep'){m.insertAdjacentHTML('afterbegin','<button class="btn" id="backHome" style="margin-bottom:14px">‹ Ana sayfa</button>');$('backHome').onclick=()=>changeView('home')}
 if(view==='rep'&&!st.seen.includes(MS[mi])){st.seen.push(MS[mi]);save();banner()}}
-$('fab').onclick=()=>form(null,tdy());$('gs').onclick=setSheet;
+$('fab').onclick=()=>form(null,tdy());$('gs').onclick=setSheet;$('searchAll').onclick=openSearch;
 document.querySelectorAll('#tb [data-v]').forEach(b=>b.onclick=()=>changeView(b.dataset.v));
 render();
 if('serviceWorker' in navigator && window.isSecureContext && location.protocol!=='file:'){
