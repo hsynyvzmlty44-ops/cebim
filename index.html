@@ -77,12 +77,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,san
 .debt-preview{display:flex;align-items:center;justify-content:space-between;gap:12px}.debt-preview small{display:block;font-size:12px;color:var(--mu);margin-top:5px}.debt-preview .btn{white-space:nowrap;font-size:12px}.home-pay{cursor:pointer}
 #tb button{font-size:11px}#tb #fab{flex-basis:48px;width:48px;height:48px;margin-top:-17px}
 @media(max-width:365px){.home-month b{font-size:14px}.debt-preview{flex-direction:column;align-items:stretch}}
+#hero .hero{background:linear-gradient(130deg,#103b40,#14534d);color:#fff;border:0}
+#hero .hero .big{font-variant-numeric:tabular-nums}#hero .hero .big.neg{color:#ffb6aa}
+#hero .hero .home-muted,#hero .hero .home-eyebrow{color:#c7e1db}
+#hero .home-summary>div{background:#ffffff12;color:white}
+#hero .home-summary span{color:#d0e8de}
+.home-safe{border-left:4px solid #328776}
+button:focus-visible,summary:focus-visible{outline:3px solid #328776;outline-offset:2px}
+.month-ledger summary{cursor:pointer;font-weight:600;padding:10px 0}
 </style></head><body>
-<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><button class="ic" id="gs">⚙︎</button></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
+<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><button class="ic" id="gs" aria-label="Ayarlar ve yedek">⚙︎</button></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
 <nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button id="fab" aria-label="Yeni kayıt">+</button><button data-v="expense">Giderler</button><button data-v="day">Takvim</button></nav>
-<div id="ov"></div><div id="ts"></div>
+<p class="note" id="offlineState" style="text-align:center" role="status"></p><div id="ov"></div><div id="ts"></div>
 <script>
-const S='2026-10-12',E='2031-12-31',APP_VERSION='23.11.2026 · Aylık gider toplamı düzeltmesi';
+const S='2026-10-12',E='2031-12-31',APP_VERSION='24.11.2026 · Çevrimdışı bütçe';
 const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],WD=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],WF=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const $=id=>document.getElementById(id),p2=n=>String(n).padStart(2,'0'),uid=()=>Math.random().toString(36).slice(2,9);
 const D=s=>new Date(s+'T00:00:00Z'),add=(d,n)=>{const t=D(d);t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},nx=d=>add(d,1),pv=d=>add(d,-1);
@@ -96,7 +104,13 @@ const guess=i=>i.c||(i.a>0?(/abi|aile/i.test(i.t)?'Aile desteği':/burs/i.test(i
 let st={start:0,items:[],debts:[],fz:true,seen:[]},view='home',hk=1,mi=curMi(),bal={},byd={};
 try{const r=JSON.parse(localStorage.getItem('cep1')||'null');if(r)st=Object.assign(st,r)}catch(e){}
 if(!Array.isArray(st.items))st.items=[];if(!Array.isArray(st.debts))st.debts=[];if(!Array.isArray(st.seen))st.seen=[];
-const save=()=>{try{localStorage.setItem('cep1',JSON.stringify(st))}catch(e){}};
+const save=()=>{
+ try{localStorage.setItem('cep1',JSON.stringify(st))}
+ catch(error){
+  toast('Kayıt cihazda saklanamadı. Sayfayı kapatmadan ayarlardan yedek indir.');
+  throw error;
+ }
+};
 const dn=id=>((st.debts.find(x=>x.id===id))||{}).n||'';
 const sg=a=>(a>0?'+':'−')+f(Math.abs(a));
 // İşlemin finansal niteliği harcama tarihi ile ödeme kaynağından ayrı tutulur.
@@ -123,9 +137,9 @@ const close=()=>$('ov').classList.remove('on');
 function sheet(h,m){const o=$('ov');o.innerHTML='<div class="sh">'+h+'</div>';o.classList.add('on');o.onclick=e=>{if(e.target===o)close()};if(m)m(o.firstChild)}
 function toast(m){const t=$('ts');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),3000)}
 function dates(d,r,en){if(r==='0')return[d];const o=[];if(r==='w'){for(let x=d;x<=en;x=add(x,7))o.push(x)}else{const[y0,m0,dd]=d.split('-').map(Number);for(let k=0;;k++){const t=y0*12+m0-1+k,y=Math.floor(t/12),m=t%12+1,x=y+'-'+p2(m)+'-'+p2(Math.min(dd,dim(y,m)));if(x>en)break;o.push(x)}}return o.length?o:[d]}
-function hero(){const t=tdy(),future=st.items.filter(i=>i.d>t&&i.d<=E),futureOut=future.filter(i=>i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').reduce((s,i)=>s-i.a,0),futureIn=future.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0);
+function hero(){const t=tdy(),monthEnd=t.slice(0,8)+dim(+t.slice(0,4),+t.slice(5,7)),future=st.items.filter(i=>i.d>t&&i.d<=monthEnd),futureOut=future.filter(i=>i.a<0&&kind(i)!=='card'&&kind(i)!=='transfer'&&kind(i)!=='adjustment').reduce((s,i)=>s-i.a,0),futureIn=future.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0);
 const n=new Date(),todayLabel=n.getDate()+' '+MN[n.getMonth()]+' '+n.getFullYear();
-$('hero').innerHTML=`<div class="home-date">${todayLabel} · ${WF[n.getDay()]}</div><div class="hero"><div class="home-eyebrow">Bugünkü tahmini bakiyen</div><div class="big ${bal[t]<0?'neg':''}">${f(bal[t])} ₺</div><div class="home-muted">Kaydettiğin işlemlere göre. Gerçek paran farklı olabilir.</div><div class="home-summary"><div><span>Planlanan gelirler</span><b class="pos">+${f(futureIn)} ₺</b></div><div><span>Planlanan nakit çıkışı</span><b class="neg">−${f(futureOut)} ₺</b></div></div></div><div class="home-safe"><div><div class="home-eyebrow">Uzun vadeli tahmin</div><strong class="${bal[E]<0?'neg':''}">${f(bal[E])} ₺</strong><small>${dl(E)} sonuna kadarki planına göre</small></div><button class="btn" id="rbo">Eşitle ↗</button></div>`;
+$('hero').innerHTML=`<div class="home-date">${todayLabel} · ${WF[n.getDay()]}</div><div class="hero"><div class="home-eyebrow">Bugün cebimde</div><div class="big ${bal[t]<0?'neg':''}">${f(bal[t])} ₺</div><div class="home-muted">Kaydettiğin işlemlere göre. Gerçek paran farklı olabilir.</div><div class="home-summary"><div><span>Ay sonuna kadar gelir</span><b class="pos">+${f(futureIn)} ₺</b></div><div><span>Ay sonuna kadar ödenecek</span><b class="neg">−${f(futureOut)} ₺</b></div></div></div><div class="home-safe"><div><div class="home-eyebrow">Ay sonunda tahmini kalan</div><strong class="${bal[monthEnd]<0?'neg':''}">${f(bal[monthEnd])} ₺</strong><small>${dl(monthEnd)} için kayıtlı plana göre</small></div><button class="btn" id="rbo">Eşitle ↗</button></div>`;
 $('rbo').onclick=realSheet}
 function banner(){const t=tdy();let p=null;MS.forEach(m=>{const[y,mo]=m.split('-').map(Number),z=m+'-'+p2(dim(y,mo));if(z<=t&&z<=E&&!st.seen.includes(m))p=m});
 $('bn').innerHTML=p&&view==='home'?`<div class="panel" style="border-color:var(--ac)"><b>📋 ${MN[+p.slice(5)-1]} ayı raporu hazır</b> <button class="btn" id="bg" style="margin-left:8px">Gör</button></div>`:'';if($('bg'))$('bg').onclick=()=>{mi=MS.indexOf(p);view='rep';render()}}
@@ -162,7 +176,7 @@ if(e){const od=e.d;Object.assign(e,{d:dd,t,a,c,b,m});if(m!=='debt'){delete e.aut
 else{const r=$('fr').value,en=$('fe').value&&$('fe').value<E?$('fe').value:E,g=r==='0'?undefined:uid();dates(dd,r,en).forEach(x=>st.items.push({id:uid(),d:x,t,a,c,b,g,m}))}
 done(dd)};
 if(e){$('fx').onclick=()=>{st.items=st.items.filter(i=>i!==e);done(e.d)};if(e.g)$('fxs').onclick=()=>{st.items=st.items.filter(i=>!(i.g===e.g&&i.d>=e.d));done(e.d)}}})}
-function realSheet(){sheet(`<h3>Gerçek bakiye</h3><p class="note">Şu an nakit ve banka hesaplarındaki harcanabilir paranı yaz. Fark, hayali gelir/gider yerine ayrı bir bakiye düzeltmesi olarak kaydedilir. Önce kredi kartıyla yaptığın eski harcamaları kart harcaması olarak işaretle.</p><label>Cebindeki para (₺)</label><input id="rb" type="number" inputmode="decimal"><button class="btn p" id="rbs">Eşitle</button>`,()=>{$('rbs').onclick=()=>{if($('rb').value==='')return;const t=tdy(),df=Math.round(+$('rb').value-(bal[t]||0));close();if(!df){toast('Fark yok, plan tutuyor ✓');return}
+function realSheet(){sheet(`<h3>Gerçek bakiye</h3><p class="note">Şu an nakit ve banka hesaplarındaki harcanabilir paranı yaz. Fark, hayali gelir/gider yerine ayrı bir bakiye düzeltmesi olarak kaydedilir. Önce kredi kartıyla yaptığın eski harcamaları kart harcaması olarak işaretle.</p><label>Cebindeki para (₺)</label><input id="rb" type="number" inputmode="decimal"><button class="btn p" id="rbs">Eşitle</button>`,()=>{$('rbs').onclick=()=>{if($('rb').value==='')return;const t=tdy(),df=roundMoney(+$('rb').value-(bal[t]||0));close();if(!df){toast('Fark yok, plan tutuyor ✓');return}
 st.items.push({id:uid(),d:t,t:'Nakit bakiye düzeltmesi',a:df,c:'Bakiye düzeltmesi',m:'adjustment'});save();mi=curMi();render();toast('Nakit bakiyesi '+f(+$('rb').value)+' ₺ olarak eşitlendi (gelir sayılmaz)')}})}
 function setSheet(){sheet(`<h3>Ayarlar ve yedek</h3><p class="note">Sürüm: ${APP_VERSION}</p><label>Başlangıç bakiyesi (12 Ekim 2026’daki para)</label><input id="sb" type="number" inputmode="decimal" value="${st.start||0}"><p class="note">Veriler bu cihazda saklanır. Başka tarayıcıya taşımak için önce yedek indir, sonra yeni yerde dosyayı seç.</p><div class="two"><button class="btn p" id="bd">⬇ Yedek dosyasını indir</button><button class="btn" id="bf">⬆ Dosyadan geri yükle</button></div><input id="bfile" type="file" accept=".json,application/json" style="display:none"><label>Metinle yedek aktarımı</label><textarea id="bk" rows="4" placeholder="Yedeği buraya yapıştır"></textarea><div class="two"><button class="btn" id="bs">Yedeği kopyala</button><button class="btn" id="bl">Yapıştırılan yedeği yükle</button></div><button class="btn w" id="bp">Panodan yapıştır</button><p class="note">İçe aktarma mevcut cihazdaki kayıtların yerini alır; işlemden önce otomatik kurtarma kopyası alınır.</p>`,()=>{
  $('sb').onchange=()=>{st.start=+$('sb').value||0;save();render()};
@@ -175,34 +189,49 @@ function setSheet(){sheet(`<h3>Ayarlar ve yedek</h3><p class="note">Sürüm: ${A
  $('bp').onclick=async()=>{try{$('bk').value=await navigator.clipboard.readText();toast('Yedek panodan alındı')}catch(e){$('bk').focus();toast('Metin kutusuna basılı tutup Yapıştır seç')}};
  $('bl').onclick=()=>{try{load(JSON.parse($('bk').value))}catch(e){toast('Yedek okunamadı: '+e.message)}};
 })}
-function afterReconcileItems(x,d){
- if(!Array.isArray(x.reconciledItemIds))return [];
- const captured=new Set(x.reconciledItemIds);
- return (byd[d]||[]).filter(i=>i.b===x.id&&!captured.has(i.id));
+function anchorAt(x,date){
+ if(x.reconciledAt===date)return {balance:x.reconciledBalance,ids:x.reconciledItemIds};
+ return x.reconcileHistory?.[date];
 }
-function applyDebtEntry(c,i){
- if(kind(i)==='card'&&i.a<0)return c-i.a;
- if(kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i))return Math.max(0,c+i.a);
- return c;
+function debtDay(x,date,opening,activity={}){
+ let balance=opening;
+ const interest=date>S&&date.endsWith('-01')&&st.fz?roundMoney(balance*(+x.r||0)/100):0;
+ balance+=interest;
+ activity.interest=(activity.interest||0)+interest;
+ const anchor=anchorAt(x,date);
+ const entries=(byd[date]||[]).filter(i=>i.b===x.id&&i.a<0&&!isUnconfirmedPlan(i));
+ const captured=i=>!Array.isArray(anchor?.ids)||anchor.ids.includes(i.id);
+ function apply(i){
+  if(kind(i)==='card'){balance-=i.a;activity.purchases=(activity.purchases||0)-i.a}
+  if(kind(i)==='debt'){
+   const amount=Math.min(balance,-i.a);
+   balance-=amount;activity.payments=(activity.payments||0)+amount;
+  }
+ }
+ entries.filter(captured).forEach(apply);
+ if(anchor){
+  activity.reconcile=(activity.reconcile||0)+anchor.balance-balance;
+  balance=+anchor.balance;
+  entries.filter(i=>!captured(i)).forEach(apply);
+ }
+ return roundMoney(balance);
 }
 function debtBalanceAt(x,upto){
- let c=Math.max(0,+x.p||0),cut=x.reconciledAt||'',anchor=Number.isFinite(+x.reconciledBalance)?Math.max(0,+x.reconciledBalance):null;
- for(let d=S;d<=upto;d=nx(d)){
-  // Banka eşitlemesi o günün tüm geçmiş hareketlerinden SONRA geçerlidir.
-  if(d>S&&d.slice(8)==='01'&&st.fz)c+=c*(+x.r||0)/100;
-  (byd[d]||[]).forEach(i=>{if(i.b!==x.id||i.a>=0||isUnconfirmedPlan(i))return;if(kind(i)==='card')c-=i.a;else if(kind(i)==='debt')c=Math.max(0,c+i.a)});
-  if(cut===d&&anchor!==null){c=anchor;afterReconcileItems(x,d).forEach(i=>{c=applyDebtEntry(c,i)})}
- }
- return c;
+ let balance=Math.max(0,+x.p||0);
+ for(let d=S;d<=upto;d=nx(d))balance=debtDay(x,d,balance);
+ return balance;
 }
 function debtRem(upto){return st.debts.reduce((sum,x)=>sum+debtBalanceAt(x,upto),0)}
 function debtView(){
  const Dd=st.debts,t=tdy(),A={};
  Dd.forEach(x=>A[x.id]={c:Math.max(0,+x.p||0),pd:0,pa:0,ia:0,rt:0,end:null});
  for(let d=S;d<=E;d=nx(d)){
-  if(d>S&&d.slice(8)==='01'&&st.fz)Dd.forEach(x=>{const a=A[x.id],q=a.c*(+x.r||0)/100;a.c+=q;a.ia+=q});
-  (byd[d]||[]).forEach(i=>{const a=i.b&&A[i.b];if(a&&i.a<0&&!isUnconfirmedPlan(i)){if(kind(i)==='card')a.c-=i.a;else if(kind(i)==='debt'){const q=Math.min(a.c,-i.a);a.c-=q;a.pa+=q;if(d<=t)a.pd+=q}}});
-  Dd.forEach(x=>{const a=A[x.id];if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){a.c=Math.max(0,+x.reconciledBalance);afterReconcileItems(x,d).forEach(i=>{a.c=applyDebtEntry(a.c,i)})}if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
+  Dd.forEach(x=>{
+   const a=A[x.id],activity={};
+   a.c=debtDay(x,d,a.c,activity);
+   a.ia+=activity.interest;a.pa+=activity.payments||0;
+   if(d<=t)a.pd+=activity.payments||0;
+   if(d<=t)a.rt=a.c;if(a.end===null&&a.c<0.5)a.end=d;if(a.c>=0.5)a.end=null});
  }
  const sm=k=>Dd.reduce((sum,x)=>sum+(k==='p'?(+x.p||0):A[x.id][k]),0);
  return`<div class="hero"><small>Şimdi toplam borç</small><div class="big">${f(sm('rt'))} ₺</div><div class="chips"><div class="chip">Bugüne dek ödenen<b>${f(sm('pd'))} ₺</b></div><div class="chip">${dl(E)} kalan<b>${f(sm('c'))} ₺</b></div></div><div class="chips"><div class="chip">Başlangıç<b>${f(sm('p'))} ₺</b></div><div class="chip">Faiz (dönem sonuna)<b>${f(sm('ia'))} ₺</b></div></div></div>
@@ -223,8 +252,8 @@ function debtSchedule(x,choices){
  const day=Math.min(28,Math.max(1,+x.dueDay||6));
  let y=now.getFullYear(),m=now.getMonth()+1,from=tdy();
  if(debtDate(y,m,day)<=from){m++;if(m>12){m=1;y++}}
- for(let k=0;k<60&&c>0.005;k++){
-  const date=debtDate(y,m,day);
+ for(let k=0;k<36;k++){
+  const date=debtDate(y,m,day);if(date>E)break;
   let interest=0,purchases=0,extraPayments=0;
   for(let d=nx(from);d<=date;d=nx(d)){
    if(d>S&&d.slice(8)==='01'&&st.fz){
@@ -243,10 +272,12 @@ function debtSchedule(x,choices){
   const recorded=st.items.filter(i=>i.b===x.id&&kind(i)==='debt'&&i.a<0&&i.d===date);
   const manual=recorded.some(i=>!i.autoDebt),recordedAmount=recorded.reduce((sum,i)=>sum-i.a,0);
   const override=x.planOverrides&&x.planOverrides[date];
-  const desired=choices&&Object.prototype.hasOwnProperty.call(choices,date)?choices[date]:recorded.length?recordedAmount:override!==undefined?+override:min;
+  const suggested=recorded.length?recordedAmount:override!==undefined?+override:min;
+  const picked=choices&&Object.hasOwn(choices,date);
+  const desired=picked?(choices[date]??suggested):recordedAmount;
   const pay=Math.min(opening,Math.max(0,roundMoney(desired)));
   c=roundMoney(Math.max(0,c-pay));
-  out.push({date,opening,min,pay,interest:roundMoney(interest),purchases:roundMoney(purchases),extraPayments:roundMoney(extraPayments),closing:c,manual,recorded:recordedAmount});
+  out.push({date,opening,min,pay,suggested,interest:roundMoney(interest),purchases:roundMoney(purchases),extraPayments:roundMoney(extraPayments),closing:c,manual,recorded:recordedAmount});
   from=date;m++;if(m>12){m=1;y++}
  }
  return out;
@@ -257,27 +288,28 @@ function debtPlanSheet(id){
  const rows=debtSchedule(x);
  sheet('<h3>'+esc(x.n)+' · Ödeme planı</h3><p class="note">Tutarı değiştirince sonraki ayların bakiyesi ve yeni kart harcamaları anında hesaplanır. Her ayın kutusunu işaretleyerek o ayı takvime kaydedebilirsin. Asgari %20, aylık faiz %'+(+x.r||0)+'. Tahmini hesaplamadır.</p><label>Her ay son ödeme günü</label><input id="dday" type="number" min="1" max="28" value="'+(+x.dueDay||6)+'"><button class="btn w" id="ddsave">Günü kaydet</button><div id="planRows" style="max-height:50vh;overflow:auto"></div><button class="btn p" id="planSave">✓ Seçili ayları kaydet ve takvime işle</button><p class="note">İşaretlenmeyen ayların mevcut kayıtları değiştirilmez. Seçili tarihte önceden kayıtlı ödeme varsa tutarı güncellenir; ikinci bir ödeme oluşturulmaz.</p>',()=>{
   const box=$('planRows'),choices={},selected={};
-  rows.slice(0,36).forEach(z=>{choices[z.date]=z.pay;selected[z.date]=false});
+  const activeChoices=()=>Object.fromEntries(Object.keys(selected).filter(d=>selected[d]).map(d=>[d,choices[d]]));
   const money=n=>f(n);
   const recalc=()=>{
-   const simulation=debtSchedule(x,choices);
+   const simulation=debtSchedule(x,activeChoices());
    const map=Object.fromEntries(simulation.map(z=>[z.date,z]));
    box.querySelectorAll('[data-row]').forEach(el=>{
     const z=map[el.dataset.row],d=el.dataset.row;
     if(!z){el.style.display='none';return}
     el.style.display='';
+    if(choices[d]===undefined)el.querySelector('[data-plan]').value=z.suggested;
     el.querySelector('[data-opening]').textContent=money(z.opening);
     el.querySelector('[data-min]').textContent=money(z.min);
     el.querySelector('[data-interest]').textContent=money(z.interest);
     el.querySelector('[data-purchases]').textContent=money(z.purchases);
     el.querySelector('[data-closing]').textContent=money(z.closing);
     el.querySelector('[data-remaining]').textContent=money(Math.max(0,z.opening-z.pay));
-    el.querySelector('[data-under]').textContent=z.pay+0.005<z.min?'⚠ Asgari tutarın altında':'';
+    el.querySelector('[data-under]').textContent=(selected[d]||z.recorded)&&z.pay+0.005<z.min?'⚠ Asgari tutarın altında':'';
    });
   };
-  box.innerHTML=rows.slice(0,36).map(z=>'<div class="panel" data-row="'+z.date+'"><div class="row" style="border:0;padding:0"><b>'+dl(z.date)+'</b><label style="display:flex;align-items:center;gap:8px;margin:0;font-size:14px"><input type="checkbox" data-check="'+z.date+'" style="width:22px;height:22px"> Kaydet</label></div><div class="note">Başlangıç <b data-opening></b> ₺ · Asgari <b data-min></b> ₺</div><label>Planlanan ödeme (₺)</label><input type="number" min="0" step="0.01" data-plan="'+z.date+'" value="'+z.pay+'"><div class="note">Ödeme sonrası kalan <b data-remaining></b> ₺ · Dönem faizi +<b data-interest></b> ₺</div><div class="note">Bu ay kartla yeni alışveriş <b data-purchases></b> ₺<br>Sonraki aya devreden borç <b data-closing></b> ₺</div><div class="note" data-under style="color:#a45b00"></div>'+(z.manual?'<div class="note">Bu tarihte önceden girilmiş ödeme var.</div>':'')+'</div>').join('');
-  box.querySelectorAll('[data-plan]').forEach(inp=>inp.addEventListener('input',()=>{choices[inp.dataset.plan]=Math.max(0,+inp.value||0);recalc()}));
-  box.querySelectorAll('[data-check]').forEach(inp=>inp.addEventListener('change',()=>{selected[inp.dataset.check]=inp.checked}));
+  box.innerHTML=rows.slice(0,36).map(z=>'<div class="panel" data-row="'+z.date+'"><div class="row" style="border:0;padding:0"><b>'+dl(z.date)+' '+z.date.slice(0,4)+'</b><label style="display:flex;align-items:center;gap:8px;margin:0;font-size:14px"><input type="checkbox" data-check="'+z.date+'" style="width:22px;height:22px"> Kaydet</label></div><div class="note">Başlangıç <b data-opening></b> ₺ · Asgari <b data-min></b> ₺</div><label>Planlanan ödeme (₺)</label><input type="number" min="0" step="0.01" data-plan="'+z.date+'" value="'+z.pay+'"><div class="note">Ödeme sonrası kalan <b data-remaining></b> ₺ · Dönem faizi +<b data-interest></b> ₺</div><div class="note">Bu ay kartla yeni alışveriş <b data-purchases></b> ₺<br>Sonraki aya devreden borç <b data-closing></b> ₺</div><div class="note" data-under style="color:#a45b00"></div>'+(z.manual?'<div class="note">Bu tarihte önceden girilmiş ödeme var.</div>':'')+'</div>').join('');
+  box.querySelectorAll('[data-plan]').forEach(inp=>inp.addEventListener('input',()=>{selected[inp.dataset.plan]=true;inp.closest('[data-row]').querySelector('[data-check]').checked=true;choices[inp.dataset.plan]=Math.max(0,+inp.value||0);recalc()}));
+  box.querySelectorAll('[data-check]').forEach(inp=>inp.addEventListener('change',()=>{selected[inp.dataset.check]=inp.checked;recalc()}));
   recalc();
   $('ddsave').onclick=()=>{x.dueDay=Math.min(28,Math.max(1,+$('dday').value||6));save();close();debtPlanSheet(id)};
   $('planSave').onclick=()=>{
@@ -291,7 +323,7 @@ function debtPlanSheet(id){
     return manual.length>1;
    });
    if(unsafe.length){toast(unsafe.length+' tarihte birden fazla manuel ödeme var; tek tek düzenle');return}
-   try{localStorage.setItem('cep1_before_plan_save_'+Date.now(),JSON.stringify(st))}catch(e){toast('Kurtarma yedeği oluşturulamadı; kayıt değiştirilmedi');return}
+   try{localStorage.setItem('cep1_before_plan_save',JSON.stringify(st))}catch(e){toast('Kurtarma yedeği oluşturulamadı; kayıt değiştirilmedi');return}
    let count=0;
    for(const date of dates){
     const z=simMap[date];if(!z)continue;
@@ -317,9 +349,13 @@ function debtReconcile(id){
  sheet('<h3>'+esc(x.n)+' · Borç eşitle</h3><p class="note">Bankada görünen güncel borcu yaz. Bu işlem farkı otomatik olarak harcama saymaz; geçmiş kayıtları değiştirmeden bugünkü borç bakiyesini sabitler.</p><label>Bankadaki güncel borç (₺)</label><input id="actualDebt" type="number" step="0.01" inputmode="decimal" value="'+Math.round(current*100)/100+'"><button class="btn p" id="reconcileDebt">Borcu güncelle</button>',()=>{
  $('reconcileDebt').onclick=()=>{
   const value=+$('actualDebt').value;
-  if(!Number.isFinite(value)||value<0)return toast('Geçerli tutar gir');
+  if($('actualDebt').value===''||!Number.isFinite(value)||value<0)return toast('Geçerli tutar gir');
   // Yeni baz borç: eski ödemeleri tekrar düşmemek için geçmiş bağlantıları koruyup dengele.
-  x.reconciledBalance=value;
+  if(x.reconciledAt&&x.reconciledAt!==tdy()){
+   x.reconcileHistory=x.reconcileHistory||{};
+   x.reconcileHistory[x.reconciledAt]=anchorAt(x,x.reconciledAt);
+  }
+  x.reconciledBalance=roundMoney(value);
   x.reconciledAt=tdy();
   x.reconciledItemIds=st.items.filter(i=>i.b===id&&i.d===tdy()).map(i=>i.id);
   x.reconcileNote='Banka bakiyesiyle manuel eşitlendi; eski ödemeler ayrıca gözden geçirilmeli';
@@ -334,18 +370,7 @@ function debtActivity(fs,fe){
  const activity={interest:0,purchases:0,payments:0,reconcile:0};
  st.debts.forEach(x=>{
   let c=fs===S?Math.max(0,+x.p||0):debtBalanceAt(x,pv(fs));
-  for(let d=fs;d<=fe;d=nx(d)){
-   if(d>S&&d.slice(8)==='01'&&st.fz){const interest=c*(+x.r||0)/100;c+=interest;activity.interest+=interest}
-   (byd[d]||[]).forEach(i=>{
-    if(i.b!==x.id)return;
-    if(kind(i)==='card'&&i.a<0){c-=i.a;activity.purchases-=i.a}
-    else if(kind(i)==='debt'&&i.a<0){const p=Math.min(c,-i.a);c-=p;activity.payments+=p}
-   });
-   if(x.reconciledAt===d&&Number.isFinite(+x.reconciledBalance)){
-    const corrected=Math.max(0,+x.reconciledBalance);
-    activity.reconcile+=corrected-c;c=corrected;afterReconcileItems(x,d).forEach(i=>{c=applyDebtEntry(c,i)});
-   }
-  }
+  for(let d=fs;d<=fe;d=nx(d))c=debtDay(x,d,c,activity);
  });
  return Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,roundMoney(v)]));
 }
@@ -363,7 +388,7 @@ const RW=(l,v,c)=>`<div class="row"><span>${l}</span><b class="${c||''}">${f(v)}
 const d0=debtRem(pv(fs)),d1=debtRem(fe),activity=debtActivity(fs,fe);
 return nav()+(z<=tdy()?'':'<p class="note">Bu ay henüz bitmedi, rakamların bir kısmı plana göre.</p>')+`<div class="panel"><b>📋 ${MN[mo-1]} ${y} raporu</b><div class="note">${dl(fs)} – ${dl(fe)}</div>${RW('Açılış bakiyesi',op)}${RW('Toplam gelir',gi,'pos')}${RW('TOPLAM AYLIK GİDER (alışveriş + kart/borç)',ge+bd,'neg')}${RW('Alışveriş toplamı (nakit + kart)',ge,'neg')}${RW('Kartla yapılan harcama',cardSpent,'neg')}${RW('Nakit harcaması',cashSpent,'neg')}${RW('Borç ödemeleri (nakit çıkışı)',bd,'neg')}${RW('Toplam nakit çıkışı (nakit harcama + borç)',cashSpent+bd,'neg')}${adjustments?RW('Nakit bakiye düzeltmesi',adjustments,adjustments<0?'neg':'pos'):''}${RW('Kapanış bakiyesi',cl,cl<0?'neg':'')}${RW('Net değişim',cl-op,cl-op<0?'neg':'pos')}<div class="row"><span>Eksiye düştüğü gün</span><b>${ng}</b></div></div>
 <p class="note">Toplam aylık gider, kartla yapılan alışverişi ve karta yapılan ödemeyi ayrı hareketler olarak sayar. Aynı alışveriş farklı aylarda iki kez görünebilir. Tekil tüketim için alışveriş toplamına bak.</p><div class="panel" style="${kd?'border-color:var(--rd)':''}"><b>Kayıt dışı harcama</b>${kd?RW('Toplam ('+kn+' düzeltme)',kd,'neg'):'<p class="note">Bu ay kayıt dışı harcama yok ✓</p>'}</div>
-<div class="panel"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Kartla yeni harcama',activity.purchases)}${RW('Eklenen tahmini faiz',activity.interest)}${RW('Bu ay borca ödenen',activity.payments)}${activity.reconcile?RW('Bankayla eşitleme farkı',activity.reconcile,activity.reconcile<0?'pos':'neg'):''}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div>
+<div class="panel"><b>Borç</b>${RW('Ay başı kalan',d0)}${RW('Kartla yeni harcama',activity.purchases)}${RW('Eklenen tahmini faiz',activity.interest)}${RW('Dönemin borç ödemeleri (plan dahil)',activity.payments)}${activity.reconcile?RW('Bankayla eşitleme farkı',activity.reconcile,activity.reconcile<0?'pos':'neg'):''}${RW('Ay sonu kalan',d1,d1>0.5?'neg':'pos')}</div>
 <div class="panel"><b>Gelirler</b>${L(inc)}</div><div class="panel"><b>Giderler</b>${L(exp)}</div>`}
 function homeView(){const T=tdy(),m=MS[mi],[y,mo]=m.split('-').map(Number),fs=m+'-01'<S?S:m+'-01',z=m+'-'+p2(dim(y,mo)),fe=z>E?E:z;
 const monthly=st.items.filter(i=>i.d>=fs&&i.d<=fe),income=monthly.filter(i=>kind(i)==='income').reduce((s,i)=>s+i.a,0),expense=sumOutgo(monthly),purchases=monthly.filter(i=>spending(i)&&i.a<0).reduce((s,i)=>s-i.a,0),debtPayments=monthly.filter(i=>kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i)).reduce((s,i)=>s-i.a,0);
@@ -418,6 +443,7 @@ function moneyPage(page){
  return `<div class="page-head"><span class="home-eyebrow">PARA AKIŞI</span><h2>${inc?'Gelirler':'Giderler'}</h2><p>${inc?'Kazançlarını ve beklediğin ödemeleri takip et.':'Kart harcamalarını alışveriş yaptığın tarihte, kart ödemelerini para hesabından çıktığı tarihte gösteriyoruz.'}</p></div>${nav()}
  <div class="panel money-total"><small>${MN[mo-1]} ${y} · ${inc?'Toplam gelir':'TOPLAM AYLIK GİDER (alışveriş + kart/borç ödemesi)'}</small><div class="big ${inc?'pos':'neg'}">${inc?'+':'−'}${f(total)} ₺</div><div class="money-split"><span>Bugüne kadar tarihli <b>${f(done)} ₺</b></span><span>Gelecek tarihli <b>${f(total-done)} ₺</b></span></div>
  ${!inc?'<div class="row" style="margin-top:10px;font-weight:600"><span>Alışveriş toplamı (nakit + kart)</span><b>'+f(purchaseTotal)+' ₺</b></div><div class="row"><span>💳 Kartla alışveriş</span><b>'+f(cardSpent)+' ₺</b></div><div class="row"><span>🏦 Nakit / banka ile alışveriş</span><b>'+f(cashSpent)+' ₺</b></div><div class="row" style="font-weight:600"><span>💸 Kart / borç ödemesi</span><b>'+f(payments)+' ₺</b></div><div class="row" style="background:var(--bg);border-radius:12px;padding:11px;margin-top:6px"><span>Toplam nakit çıkışı <small style="display:block">Nakit harcamalar + borç ödemeleri</small></span><b class="neg">'+f(cashOut)+' ₺</b></div><div class="note" style="margin-top:9px">Bu üstteki gider toplamı aylık hareketlerin toplamıdır: önceki alışverişin kart ödemesi de ayrı bir hareket olarak dahildir. Tekil tüketim tutarı için alışveriş toplamına bak.</div>':''}
+ ${inc?'':'<details class="month-ledger"><summary>Toplama giren işlemler ('+month.filter(monthlyOutgo).length+')</summary>'+month.filter(monthlyOutgo).sort((a,b)=>a.d.localeCompare(b.d)).map(row).join('')+'</details>'}
  </div>
  ${!inc?`<div class="home-section-title">💳 Kredi kartı ve borç ödemeleri</div>
  <div class="panel"><div class="row"><span>Kaydedilen / tarihi gelen</span><b>${f(paidNow)} ₺</b></div><div class="row"><span>Geleceğe planlanan</span><b>${f(plannedPay)} ₺</b></div><div class="note" style="margin:8px 0">İşleme dokunarak tutarı veya hangi karta ödendiğini düzenleyebilirsin.</div>${paymentsHtml}<button class="btn w" id="cardPaymentAdd">+ Kart / borç ödemesi ekle</button></div>${pendingHtml}
@@ -426,7 +452,7 @@ function moneyPage(page){
  <button class="btn p" id="moneyAdd">+ ${inc?'Gelir':'Gider'} ekle</button>`;
 }
 function changeView(v){view=v;render();window.scrollTo(0,0)}
-function render(){document.getElementById("preview-warning")?.remove();build();hero();banner();
+function render(){if(view==='home')mi=curMi();document.getElementById("preview-warning")?.remove();build();hero();banner();
 document.querySelectorAll('#tb [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
 $('hero').style.display=view==='home'?'block':'none';
 const m=$('main');m.innerHTML=view==='home'?homeView():view==='income'?moneyPage('income'):view==='expense'?moneyPage('expense'):view==='day'?dayView():view==='debt'?debtView():repView();
@@ -454,4 +480,9 @@ if(view==='rep'&&!st.seen.includes(MS[mi])){st.seen.push(MS[mi]);save();banner()
 $('fab').onclick=()=>form(null,tdy());$('gs').onclick=setSheet;
 document.querySelectorAll('#tb [data-v]').forEach(b=>b.onclick=()=>changeView(b.dataset.v));
 render();
+if('serviceWorker' in navigator && window.isSecureContext && location.protocol!=='file:'){
+ navigator.serviceWorker.register('./sw.js').then(()=>navigator.serviceWorker.ready)
+ .then(()=>{$('offlineState').textContent='Çevrimdışı kullanıma hazır'})
+ .catch(()=>{$('offlineState').textContent='Çevrimdışı açılış hazırlanamadı'});
+}
 </script></body></html>
