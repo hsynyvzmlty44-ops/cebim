@@ -108,7 +108,7 @@ button:focus-visible,summary:focus-visible{outline:3px solid #328776;outline-off
 <nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button id="fab" aria-label="Yeni kayıt">+</button><button data-v="expense">Giderler</button><button data-v="day">Takvim</button></nav>
 <p class="note" id="offlineState" style="text-align:center" role="status"></p><div id="ov"></div><div id="ts"></div>
 <script>
-const S='2026-10-12',E='2031-12-31',APP_VERSION='25.11.2026 · Karta özel hesap kesim günü';
+const S='2026-10-12',E='2031-12-31',APP_VERSION='26.11.2026 · Son ödeme günü ve günlük faiz';
 const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],WD=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],WF=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const $=id=>document.getElementById(id),p2=n=>String(n).padStart(2,'0'),uid=()=>Math.random().toString(36).slice(2,9);
 const D=s=>new Date(s+'T00:00:00Z'),add=(d,n)=>{const t=D(d);t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},nx=d=>add(d,1),pv=d=>add(d,-1);
@@ -222,10 +222,11 @@ function setClosingDay(x,day,date){
  x.closingDays.push({from:date,day});
  x.closingDays.sort((a,b)=>a.from.localeCompare(b.from));
 }
-function newCycle(){return {unpaid:0,fees:0}}
+function newCycle(){return {unpaid:0,fees:0,accrued:0,due:""}}
 function debtDay(x,date,opening,activity,cycle,entriesForDay){
  let balance=opening;
  let interest=0;
+ if(st.fz && cycle.due)cycle.accrued+=cycle.unpaid*(+x.r||0)/3000;
  const anchor=anchorAt(x,date);
  const entries=(entriesForDay||byd[date]||[]).filter(i=>i.b===x.id&&i.a<0&&!isUnconfirmedPlan(i));
  const captured=i=>!Array.isArray(anchor?.ids)||anchor.ids.includes(i.id);
@@ -247,11 +248,18 @@ function debtDay(x,date,opening,activity,cycle,entriesForDay){
   cycle.unpaid=Math.min(cycle.unpaid,balance-cycle.fees);
   entries.filter(i=>!captured(i)).forEach(apply);
  }
+ if(date<=cycle.due && cycle.unpaid<=0.005)cycle.accrued=0;
  const day=closingDayAt(x,date);
  if(day && cycle.lastMonth!==date.slice(0,7) && Number(date.slice(8))===Math.min(day,dim(+date.slice(0,4),+date.slice(5,7)))){
   cycle.lastMonth=date.slice(0,7);
   // An end-of-day bank balance already includes that day's posted charges.
-  if(st.fz&&!anchor)interest=roundMoney(cycle.unpaid*(+x.r||0)/100);
+  if(st.fz&&!anchor)interest=roundMoney(cycle.accrued);
+  cycle.accrued=0;
+  let [year,month]=date.split('-').map(Number);
+  const dueDay=Math.min(28,Math.max(1,+x.dueDay||6));
+  if(dueDay<=Number(date.slice(8)))month++;
+  if(month>12){year++;month=1}
+  cycle.due=debtDate(year,month,dueDay);
   cycle.unpaid=Math.max(0,roundMoney(balance-cycle.fees));
   balance+=interest;cycle.fees+=interest;
  }
@@ -281,7 +289,7 @@ function debtView(){
  (Dd.length?Dd.map(x=>{const a=A[x.id],pr=Math.min(100,a.pa/(x.p+a.ia||1)*100);return`<div class="panel" data-x="${x.id}"><div class="row" style="border:0;padding:0"><b>${esc(x.n)}</b><b>${f(a.rt)} ₺</b></div><div class="bar"><i style="width:${pr}%"></i></div><div class="note">${x.reconciledAt?'Bankayla '+dl(x.reconciledAt)+' tarihinde eşitlendi · ':''}${closingDayAt(x,t)?'Kesim günü: '+closingDayAt(x,t):'Hesap kesim günü girilmedi · Faiz tahmini kapalı'} · Geçmiş ödemeler ${f(a.pd)} ₺ · Faiz %${x.r}/ay · ${!x.p?'-':a.end?'Biter: '+dl(a.end):dl(E)+' sonuna kadar bitmiyor'}</div><div class="two"><button class="btn" data-plan-open="${x.id}">Ödeme planı</button><button class="btn" data-reconcile="${x.id}">Borcu eşitle</button></div></div>`}).join(''):'<p class="note">Henüz borç eklenmedi.</p>')+
  '<button class="btn w" id="nd">+ Borç ekle</button><p class="note">Borcu eşitle, girilen tutarı bugün itibarıyla kesin başlangıç noktası kabul eder. Önceki ödemeler yeniden düşülmez; sonraki ödemeler ve faizler hesaplanır.</p>'
 }
-function debtSheet(id){const x=st.debts.find(z=>z.id===id);if(!x)return;sheet(`<h3>Borç</h3><label>Ad</label><input id="dn" value="${att(x.n)}"><label>Başlangıç tutarı (₺)</label><input id="dp" type="number" inputmode="decimal" value="${x.p}"><label>Aylık faiz %</label><input id="dr" type="number" inputmode="decimal" step="0.01" value="${x.r}"><label for="cutDay">Her ay hesap kesim günü</label><input id="cutDay" type="number" min="1" max="31" step="1" inputmode="numeric" placeholder="Ekstrende yazan gün" value="${closingDayAt(x,tdy())||''}"><p class="note">Boş bırakırsan faiz tahmini kapalı kalır. İlk kesim ekstre bakiyesini belirler. Sonraki kesimlerde önceki ekstreden kalan anapara üzerinden tahmin yapılır. Vergiler ve gecikme faizi hariçtir.</p><button class="btn p" id="ds">Kaydet</button><button class="btn dz" id="dx">Borcu sil</button>`,()=>{
+function debtSheet(id){const x=st.debts.find(z=>z.id===id);if(!x)return;sheet(`<h3>Borç</h3><label>Ad</label><input id="dn" value="${att(x.n)}"><label>Başlangıç tutarı (₺)</label><input id="dp" type="number" inputmode="decimal" value="${x.p}"><label>Aylık faiz %</label><input id="dr" type="number" inputmode="decimal" step="0.01" value="${x.r}"><label for="cutDay">Her ay hesap kesim günü</label><input id="cutDay" type="number" min="1" max="31" step="1" inputmode="numeric" placeholder="Ekstrende yazan gün" value="${closingDayAt(x,tdy())||''}"><p class="note">Boş bırakırsan faiz tahmini kapalı kalır. İlk kesim ekstre bakiyesini belirler. Ekstre son ödeme gününe kadar tamamen kapanırsa alışveriş faizi sıfırdır. Aksi halde kesimden itibaren günlük kalan ekstre anaparasıyla tahmin yapılır. Vergiler ve gecikme faizi hariçtir.</p><button class="btn p" id="ds">Kaydet</button><button class="btn dz" id="dx">Borcu sil</button>`,()=>{
 $('dn').select();$('ds').onclick=()=>{
  const input=$('cutDay'),day=input.value===''?0:input.valueAsNumber;
  if(input.validity.badInput || input.value!==''&&(!Number.isInteger(day)||day<1||day>31))return toast('Kesim günü 1–31 arasında olmalı');
