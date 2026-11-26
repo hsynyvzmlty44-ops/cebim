@@ -104,11 +104,11 @@ button:focus-visible,summary:focus-visible{outline:3px solid #328776;outline-off
 .pending-link{display:block;width:100%;text-align:left;color:var(--tx);background:var(--bg);border:0;border-radius:10px;padding:10px 12px;font:inherit;margin-bottom:12px;cursor:pointer}
 .pending-link small{display:block;color:var(--mu);margin-top:2px}
 </style></head><body>
-<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><div class="header-tools"><button class="btn" id="searchAll">İşlem ara</button><button class="ic" id="gs" aria-label="Ayarlar ve yedek">⚙︎</button></div></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
-<nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button id="fab" aria-label="Yeni kayıt">+</button><button data-v="expense">Giderler</button><button data-v="day">Takvim</button></nav>
+<div id="preview-warning" style="background:#fff3d8;color:#75510a;padding:12px 18px;font:14px system-ui;text-align:center">Önizleme uygulamayı çalıştırmıyorsa bu dosyayı GitHub Pages üzerinde aç. Finansal verilerini önce yedekle.</div><div id="app"><header><h1>Cebim</h1><div class="header-tools"><button class="btn" id="fab" aria-label="Yeni kayıt">+ Ekle</button><button class="btn" id="searchAll">İşlem ara</button><button class="ic" id="gs" aria-label="Ayarlar ve yedek">⚙︎</button></div></header><div id="hero"></div><div id="bn"></div><div id="main"></div></div>
+<nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button data-v="expense">Giderler</button><button data-v="debt">Borçlar</button><button data-v="day">Takvim</button></nav>
 <p class="note" id="offlineState" style="text-align:center" role="status"></p><div id="ov"></div><div id="ts"></div>
 <script>
-const S='2026-10-12',E='2031-12-31',APP_VERSION='26.11.2026 · Son ödeme günü ve günlük faiz';
+const S='2026-10-12',E='2031-12-31',APP_VERSION='26.11.2026 · Borçlar ve ekstre asgarisi';
 const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],WD=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],WF=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const $=id=>document.getElementById(id),p2=n=>String(n).padStart(2,'0'),uid=()=>Math.random().toString(36).slice(2,9);
 const D=s=>new Date(s+'T00:00:00Z'),add=(d,n)=>{const t=D(d);t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},nx=d=>add(d,1),pv=d=>add(d,-1);
@@ -234,6 +234,7 @@ function debtDay(x,date,opening,activity,cycle,entriesForDay){
   if(kind(i)==='card'){balance-=i.a;activity.purchases=(activity.purchases||0)-i.a}
   if(kind(i)==='debt'){
    const amount=Math.min(balance,-i.a);
+   cycle.minimumLeft=Math.max(0,roundMoney((cycle.minimumLeft||0)-amount));
    const feesPaid=Math.min(cycle.fees,amount);
    cycle.fees-=feesPaid;
    cycle.unpaid=Math.max(0,cycle.unpaid-(amount-feesPaid));
@@ -256,12 +257,13 @@ function debtDay(x,date,opening,activity,cycle,entriesForDay){
   if(st.fz&&!anchor)interest=roundMoney(cycle.accrued);
   cycle.accrued=0;
   let [year,month]=date.split('-').map(Number);
-  const dueDay=Math.min(28,Math.max(1,+x.dueDay||6));
-  if(dueDay<=Number(date.slice(8)))month++;
+  const dueDay=Math.min(31,Math.max(1,+x.dueDay||6));
+  if(debtDate(year,month,dueDay)<=date)month++;
   if(month>12){year++;month=1}
   cycle.due=debtDate(year,month,dueDay);
   cycle.unpaid=Math.max(0,roundMoney(balance-cycle.fees));
   balance+=interest;cycle.fees+=interest;
+  cycle.minimumLeft=roundMoney(balance*.2);
  }
  activity.interest=(activity.interest||0)+interest;
  return roundMoney(balance);
@@ -303,7 +305,7 @@ function debtSchedule(x,choices){
  // Borç paneli ve takvimle AYNI tarihsel faiz modelini kullanır:
  const cycle=newCycle();
  let c=debtBalanceAt(x,tdy(),cycle),out=[],now=new Date(tdy()+'T12:00:00');
- const day=Math.min(28,Math.max(1,+x.dueDay||6));
+ const day=Math.min(31,Math.max(1,+x.dueDay||6));
  let y=now.getFullYear(),m=now.getMonth()+1,from=tdy();
  if(debtDate(y,m,day)<=from){m++;if(m>12){m=1;y++}}
  for(let k=0;k<36;k++){
@@ -317,7 +319,7 @@ function debtSchedule(x,choices){
   const manual=recorded.some(i=>!i.autoDebt),recordedAmount=recorded.reduce((sum,i)=>sum-i.a,0);
   const other=entries.filter(i=>!recorded.includes(i));
   const beforePayment=roundMoney(c+other.filter(i=>i.b===x.id&&kind(i)==='card'&&i.a<0).reduce((sum,i)=>sum-i.a,0));
-  const min=roundMoney(beforePayment*.2);
+  const min=closingDayAt(x,date)?Math.min(beforePayment,cycle.due===date?cycle.minimumLeft||0:0):roundMoney(beforePayment*.2);
   const suggested=recorded.length?recordedAmount:x.planOverrides?.[date]??min;
   const picked=choices&&Object.hasOwn(choices,date);
   const target=picked?(choices[date]??suggested):recordedAmount;
@@ -335,7 +337,7 @@ function debtPlanSheet(id){
  const x=st.debts.find(v=>v.id===id);if(!x)return;
  x.planOverrides=x.planOverrides||{};
  const rows=debtSchedule(x);
- sheet('<h3>'+esc(x.n)+' · Ödeme planı</h3><p class="note">Tutarı değiştirince sonraki ayların bakiyesi ve yeni kart harcamaları anında hesaplanır. Her ayın kutusunu işaretleyerek o ayı takvime kaydedebilirsin. Asgari %20, aylık faiz %'+(+x.r||0)+'. Tahmini hesaplamadır.</p><button class="btn w" id="editCut">Hesap kesim günü: '+(closingDayAt(x,tdy())||'Belirle')+'</button><label>Her ay son ödeme günü</label><input id="dday" type="number" min="1" max="28" value="'+(+x.dueDay||6)+'"><button class="btn w" id="ddsave">Günü kaydet</button><div id="planRows" style="max-height:50vh;overflow:auto"></div><button class="btn p" id="planSave">✓ Seçili ayları kaydet ve takvime işle</button><p class="note">İşaretlenmeyen ayların mevcut kayıtları değiştirilmez. Seçili tarihte önceden kayıtlı ödeme varsa tutarı güncellenir; ikinci bir ödeme oluşturulmaz.</p>',()=>{
+ sheet('<h3>'+esc(x.n)+' · Ödeme planı</h3><p class="note">Tutarı değiştirince sonraki ayların bakiyesi ve yeni kart harcamaları anında hesaplanır. Her ayın kutusunu işaretleyerek o ayı takvime kaydedebilirsin. Asgari %20, aylık faiz %'+(+x.r||0)+'. Tahmini hesaplamadır.</p><button class="btn w" id="editCut">Hesap kesim günü: '+(closingDayAt(x,tdy())||'Belirle')+'</button><label>Her ay son ödeme günü</label><input id="dday" type="number" min="1" max="31" value="'+(+x.dueDay||6)+'"><button class="btn w" id="ddsave">Günü kaydet</button><div id="planRows" style="max-height:50vh;overflow:auto"></div><button class="btn p" id="planSave">✓ Seçili ayları kaydet ve takvime işle</button><p class="note">İşaretlenmeyen ayların mevcut kayıtları değiştirilmez. Seçili tarihte önceden kayıtlı ödeme varsa tutarı güncellenir; ikinci bir ödeme oluşturulmaz.</p>',()=>{
   const box=$('planRows'),choices={},selected={};
   const activeChoices=()=>Object.fromEntries(Object.keys(selected).filter(d=>selected[d]).map(d=>[d,choices[d]]));
   const money=n=>f(n);
@@ -361,7 +363,7 @@ function debtPlanSheet(id){
   box.querySelectorAll('[data-check]').forEach(inp=>inp.addEventListener('change',()=>{selected[inp.dataset.check]=inp.checked;recalc()}));
   recalc();
   $('editCut').onclick=()=>debtSheet(id);
-  $('ddsave').onclick=()=>{x.dueDay=Math.min(28,Math.max(1,+$('dday').value||6));save();close();debtPlanSheet(id)};
+  $('ddsave').onclick=()=>{x.dueDay=Math.min(31,Math.max(1,+$('dday').value||6));save();close();debtPlanSheet(id)};
   $('planSave').onclick=()=>{
    const dates=Object.keys(selected).filter(d=>selected[d]&&d>tdy()&&d<=E);
    if(!dates.length){toast('Önce kaydedilecek gelecek ayları işaretle');return}
@@ -589,7 +591,6 @@ function moneyPage(page){
  const month=st.items.filter(i=>i.d>=fs&&i.d<=fe);
  const spent=month.filter(i=>spending(i)&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
  const debtPaid=month.filter(i=>kind(i)==='debt'&&i.a<0&&!isUnconfirmedPlan(i)).sort((a,b)=>a.d.localeCompare(b.d));
- const pendingDebt=month.filter(isUnconfirmedPlan).sort((a,b)=>a.d.localeCompare(b.d));
  const incomes=month.filter(i=>kind(i)==='income').sort((a,b)=>a.d.localeCompare(b.d));
  const items=inc?incomes:spent;
  const purchaseTotal=spent.reduce((n,i)=>n-i.a,0);
@@ -598,23 +599,16 @@ function moneyPage(page){
  const cashSpent=spent.filter(i=>kind(i)==='cash').reduce((n,i)=>n-i.a,0);
  const cardSpent=spent.filter(i=>kind(i)==='card').reduce((n,i)=>n-i.a,0);
  const payments=debtPaid.reduce((n,i)=>n-i.a,0);
- const paidNow=debtPaid.filter(i=>i.d<=T).reduce((n,i)=>n-i.a,0);
- const plannedPay=debtPaid.filter(i=>i.d>T).reduce((n,i)=>n-i.a,0);
- const pendingPay=pendingDebt.reduce((n,i)=>n-i.a,0);
  const cashOut=cashSpent+payments;
- const cats={};items.forEach(i=>{const c=guess(i);(cats[c]??=[]).push(i)});
+ const cats=Object.create(null);items.forEach(i=>{const c=guess(i);(cats[c]??=[]).push(i)});
  const row=i=>`<div class="row tappable" data-e="${i.id}"><span><b>${esc(i.t)}</b><br><small>${dl(i.d)} · ${kind(i)==='card'?'💳 '+esc(dn(i.b)||'Kart'):kind(i)==='debt'?(isUnconfirmedPlan(i)?'⏳ Ödeme onayı bekliyor':i.d>T?'⏳ Planlanan ödeme':'✓ Kayıtlı ödeme')+' · '+esc(dn(i.b)||'Borç'):i.d>T?'Planlandı':'Kayıtlı'}</small></span><b class="${inc?'pos':'neg'}">${sg(i.a)} ₺</b></div>`;
- const catHtml=Object.entries(cats).sort((a,b)=>b[1].reduce((n,i)=>n+Math.abs(i.a),0)-a[1].reduce((n,i)=>n+Math.abs(i.a),0)).map(([name,rows])=>`<details class="cat-card" open><summary><span>${esc(name)}<small>${rows.length} işlem</small></span><strong class="${inc?'pos':'neg'}">${f(rows.reduce((n,i)=>n+Math.abs(i.a),0))} ₺</strong></summary>${rows.map(row).join('')}</details>`).join('');
- const paymentsHtml=debtPaid.length?debtPaid.map(row).join(''):'<p class="note">Bu ay için kart veya borç ödemesi kaydı yok.</p>';
- const pendingHtml=pendingDebt.length?'<div class="panel" style="border-color:var(--rd)"><b>⏳ Onay bekleyen ödemeler · '+f(pendingPay)+' ₺</b><p class="note">Ödeme günü geçti ama işlem henüz onaylanmadı. Nakit ve borç bakiyesinden düşülmedi. Kayda basıp gerçekleştiyse onayla.</p>'+pendingDebt.map(row).join('')+'</div>':'';
+ const catHtml=Object.entries(cats).sort((a,b)=>b[1].reduce((n,i)=>n+Math.abs(i.a),0)-a[1].reduce((n,i)=>n+Math.abs(i.a),0)).map(([name,rows])=>`<details class="cat-card"><summary><span>${esc(name)}<small>${rows.length} işlem</small></span><strong class="${inc?'pos':'neg'}">${f(rows.reduce((n,i)=>n+Math.abs(i.a),0))} ₺</strong></summary>${rows.map(row).join('')}</details>`).join('');
  return `<div class="page-head"><span class="home-eyebrow">PARA AKIŞI</span><h2>${inc?'Gelirler':'Giderler'}</h2><p>${inc?'Kazançlarını ve beklediğin ödemeleri takip et.':'Kart harcamalarını alışveriş yaptığın tarihte, kart ödemelerini para hesabından çıktığı tarihte gösteriyoruz.'}</p></div>${nav()}
  <div class="panel money-total"><small>${MN[mo-1]} ${y} · ${inc?'Toplam gelir':'TOPLAM AYLIK GİDER (alışveriş + kart/borç ödemesi)'}</small><div class="big ${inc?'pos':'neg'}">${inc?'+':'−'}${f(total)} ₺</div><div class="money-split"><span>Bugüne kadar tarihli <b>${f(done)} ₺</b></span><span>Gelecek tarihli <b>${f(total-done)} ₺</b></span></div>
- ${!inc?'<div class="row" style="margin-top:10px;font-weight:600"><span>Alışveriş toplamı (nakit + kart)</span><b>'+f(purchaseTotal)+' ₺</b></div><div class="row"><span>💳 Kartla alışveriş</span><b>'+f(cardSpent)+' ₺</b></div><div class="row"><span>🏦 Nakit / banka ile alışveriş</span><b>'+f(cashSpent)+' ₺</b></div><div class="row" style="font-weight:600"><span>💸 Kart / borç ödemesi</span><b>'+f(payments)+' ₺</b></div><div class="row" style="background:var(--bg);border-radius:12px;padding:11px;margin-top:6px"><span>Toplam nakit çıkışı <small style="display:block">Nakit harcamalar + borç ödemeleri</small></span><b class="neg">'+f(cashOut)+' ₺</b></div><div class="note" style="margin-top:9px">Bu üstteki gider toplamı aylık hareketlerin toplamıdır: önceki alışverişin kart ödemesi de ayrı bir hareket olarak dahildir. Tekil tüketim tutarı için alışveriş toplamına bak.</div>':''}
+ ${!inc?'<details class="month-ledger"><summary>Alışveriş ve ödeme dağılımı</summary><div class="row" style="margin-top:10px;font-weight:600"><span>Alışveriş toplamı (nakit + kart)</span><b>'+f(purchaseTotal)+' ₺</b></div><div class="row"><span>💳 Kartla alışveriş</span><b>'+f(cardSpent)+' ₺</b></div><div class="row"><span>🏦 Nakit / banka ile alışveriş</span><b>'+f(cashSpent)+' ₺</b></div><div class="row" style="font-weight:600"><span>💸 Kart / borç ödemesi</span><b>'+f(payments)+' ₺</b></div><div class="row" style="background:var(--bg);border-radius:12px;padding:11px;margin-top:6px"><span>Toplam nakit çıkışı <small style="display:block">Nakit harcamalar + borç ödemeleri</small></span><b class="neg">'+f(cashOut)+' ₺</b></div><div class="note" style="margin-top:9px">Bu üstteki gider toplamı aylık hareketlerin toplamıdır: önceki alışverişin kart ödemesi de ayrı bir hareket olarak dahildir. Tekil tüketim tutarı için alışveriş toplamına bak.</div></details>':''}
  ${inc?'':'<details class="month-ledger"><summary>Toplama giren işlemler ('+month.filter(monthlyOutgo).length+')</summary>'+month.filter(monthlyOutgo).sort((a,b)=>a.d.localeCompare(b.d)).map(row).join('')+'</details>'}
  </div>
- ${!inc?`<div class="home-section-title">💳 Kredi kartı ve borç ödemeleri</div>
- <div class="panel"><div class="row"><span>Kaydedilen / tarihi gelen</span><b>${f(paidNow)} ₺</b></div><div class="row"><span>Geleceğe planlanan</span><b>${f(plannedPay)} ₺</b></div><div class="note" style="margin:8px 0">İşleme dokunarak tutarı veya hangi karta ödendiğini düzenleyebilirsin.</div>${paymentsHtml}<button class="btn w" id="cardPaymentAdd">+ Kart / borç ödemesi ekle</button></div>${pendingHtml}
- <div class="home-section-title">Borçlar <button id="debtMore">Yönet →</button></div><div class="panel debt-preview"><div><b>${st.debts.length} borç hesabı</b><small>Faiz ve ödeme planlarını görüntüle</small></div><button class="btn" id="debtOpen">Borçları aç →</button></div><button class="btn w" id="cardBackfill">💳 Geçmiş kart harcamalarını düzelt</button>`:''}
+ ${!inc?'<details class="cat-card"><summary>Geçmiş kayıtları düzenle</summary><button class="btn w" id="cardBackfill">Geçmiş kart harcamalarını düzelt</button></details>':''}
  <div class="home-section-title">${inc?'Gelir kaynakları':'Alışveriş / gider kategorileri'}</div>${catHtml||'<div class="panel home-muted">Bu ay henüz kayıt yok.</div>'}
  <button class="btn p" id="moneyAdd">+ ${inc?'Gelir':'Gider'} ekle</button>`;
 }
@@ -629,13 +623,14 @@ m.querySelectorAll('[data-e]').forEach(r=>r.onclick=()=>form(st.items.find(i=>i.
 m.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{hk=+b.dataset.h;render()});
 m.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>changeView(el.dataset.go));
 if($('moneyAdd'))$('moneyAdd').onclick=()=>form(null,tdy(),view==='income'?1:-1);
-if($('debtMore'))$('debtMore').onclick=()=>changeView('debt');
-if($('debtOpen'))$('debtOpen').onclick=()=>changeView('debt');
+
+
 if($('cardBackfill'))$('cardBackfill').onclick=cardHistorySheet;
-if($('cardPaymentAdd'))$('cardPaymentAdd').onclick=()=>form(null,tdy(),-1,'debt');
+
 if($('welcomeStart'))$('welcomeStart').onclick=setSheet;
 if($('allDay'))$('allDay').onclick=()=>changeView('day');
 if($('allDay2'))$('allDay2').onclick=()=>{Object.assign(searchState,{query:'',method:'',period:'past',limit:40});openSearch()};
+if(view==='debt'&&st.items.some(isUnconfirmedPlan))m.insertAdjacentHTML('afterbegin','<button class="btn w" id="pendingReview">Onay bekleyen ödemeleri gör</button>');
 if($('pendingReview'))$('pendingReview').onclick=()=>{
  Object.assign(searchState,{query:'',method:'',period:'pending',limit:40});
  openSearch();
@@ -645,7 +640,7 @@ if(view==='search')bindSearch();
 if($('allRep'))$('allRep').onclick=()=>changeView('rep');
 if($('ha'))$('ha').onclick=()=>{const q=MS[mi]===tdy().slice(0,7)?tdy():(MS[mi]+'-01'<S?S:MS[mi]+'-01');form(null,q,hk)};
 if(view==='day'&&!window.__sc){const r=m.querySelector('.today');if(r){window.__sc=1;r.scrollIntoView({block:'start'})}}
-if(view==='debt'){m.insertAdjacentHTML('afterbegin','<button class="btn" id="backExpenses" style="margin-bottom:14px">‹ Giderlere dön</button>');$('backExpenses').onclick=()=>changeView('expense');m.querySelectorAll('[data-plan-open]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtPlanSheet(b.dataset.planOpen)});m.querySelectorAll('[data-reconcile]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtReconcile(b.dataset.reconcile)});m.querySelectorAll('[data-x]').forEach(r=>r.onclick=()=>debtSheet(r.dataset.x));$('fz').onchange=()=>{st.fz=$('fz').checked;save();render()};
+if(view==='debt'){m.insertAdjacentHTML('afterbegin','<div class="tools-head"><h2>Borçlar</h2><button class="btn" id="payDebt">Ödeme ekle</button></div>');$('payDebt').onclick=()=>st.debts.length?form(null,tdy(),-1,'debt'):toast('Önce bir borç ekle');m.querySelectorAll('[data-plan-open]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtPlanSheet(b.dataset.planOpen)});m.querySelectorAll('[data-reconcile]').forEach(b=>b.onclick=e=>{e.stopPropagation();debtReconcile(b.dataset.reconcile)});m.querySelectorAll('[data-x]').forEach(r=>r.onclick=()=>debtSheet(r.dataset.x));$('fz').onchange=()=>{st.fz=$('fz').checked;save();render()};
 $('nd').onclick=()=>{const id=uid();st.debts.push({id,n:'Yeni borç',p:0,r:4,dueDay:6,planOverrides:{}});save();render();debtSheet(id)};
 /* kaldırılan eski otomatik ödeme düğmesi */}
 if(view==='rep'){m.insertAdjacentHTML('afterbegin','<button class="btn" id="backHome" style="margin-bottom:14px">‹ Ana sayfa</button>');$('backHome').onclick=()=>changeView('home')}
