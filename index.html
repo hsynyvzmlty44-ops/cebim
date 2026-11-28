@@ -109,7 +109,7 @@ button:focus-visible,summary:focus-visible{outline:3px solid #328776;outline-off
 <nav id="tb"><button data-v="home" class="on">Ana sayfa</button><button data-v="income">Gelirler</button><button data-v="expense">Giderler</button><button data-v="debt">Borçlar</button><button data-v="day">Takvim</button></nav>
 <p class="note" id="offlineState" style="text-align:center" role="status"></p><div id="ov"></div><div id="ts"></div>
 <script>
-const S='2026-10-12',E='2031-12-31',APP_VERSION='28.11.2026 · Ödeme sonrası kalan borç';
+const S='2026-10-12',E='2031-12-31',APP_VERSION='28.11.2026 · Kayıtlı ödeme planlarını düzenleme';
 const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],WD=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],WF=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
 const $=id=>document.getElementById(id),p2=n=>String(n).padStart(2,'0'),uid=()=>Math.random().toString(36).slice(2,9);
 const D=s=>new Date(s+'T00:00:00Z'),add=(d,n)=>{const t=D(d);t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},nx=d=>add(d,1),pv=d=>add(d,-1);
@@ -353,11 +353,48 @@ function debtSchedule(x,choices){
  }
  return out;
 }
+function savedPaymentEditor(debtId,itemId){
+ const item=st.items.find(i=>i.id===itemId&&i.b===debtId&&kind(i)==='debt');
+ if(!item)return;
+ const pending=isUnconfirmedPlan(item);
+ const earliest=pending?item.d:tdy();
+ sheet(`<h3>Planlanan ödemeyi düzenle</h3><p class="note">${esc(dn(debtId))} · ${fullDay(item.d)} · ${f(-item.a)} ₺</p>
+ <label for="planDate">Ödeme tarihi</label><input id="planDate" type="date" min="${earliest}" max="${E}" value="${item.d}">
+ <label for="planAmount">Ödeme tutarı (₺)</label><input id="planAmount" type="number" inputmode="decimal" min="0.01" step="0.01" value="${-item.a}">
+ <button class="btn p" id="updatePayment">Değişiklikleri kaydet</button><button class="btn dz" id="removePayment">Bu ödemeyi plandan kaldır</button>
+ <button class="btn w" id="cancelPayment">Plana geri dön</button>`,()=>{
+  const back=()=>debtPlanSheet(debtId);
+  $('cancelPayment').onclick=back;
+  function commit(remove){
+   const date=$('planDate').value,amount=roundMoney($('planAmount').valueAsNumber);
+   if(!remove&&(!date||date<earliest||date>E||amount<=0||!Number.isFinite(amount)))return toast('Geçerli bir tarih ve tutar gir');
+   if(!remove&&date!==item.d&&st.items.some(i=>i.b===debtId&&kind(i)==='debt'&&i.d===date))return toast('Bu tarihte ödeme var. Listeden o ödemeyi düzenle.');
+   const debt=st.debts.find(x=>x.id===debtId);
+   const nextItems=remove?st.items.filter(i=>i!==item):st.items.map(i=>i===item?{...i,d:date,a:-amount}:i);
+   const overrides={...debt.planOverrides};
+   delete overrides[item.d];
+   const next={...st,items:nextItems,debts:st.debts.map(x=>x===debt?{...x,planOverrides:overrides}:x)};
+   try{localStorage.setItem('cep1_before_plan_save',JSON.stringify(st));localStorage.setItem('cep1',JSON.stringify(next))}
+   catch{toast('Değişiklik kaydedilemedi');return}
+   st=next;render();back();toast(remove?'Ödeme plandan kaldırıldı':'Ödeme güncellendi');
+  }
+  $('updatePayment').onclick=()=>commit(false);
+  $('removePayment').onclick=()=>{if(confirm(fullDay(item.d)+' tarihli '+f(-item.a)+' ₺ ödeme plandan kaldırılsın mı?'))commit(true)};
+ });
+}
 function debtPlanSheet(id){
  const x=st.debts.find(v=>v.id===id);if(!x)return;
  x.planOverrides=x.planOverrides||{};
- const rows=debtSchedule(x);
- sheet('<h3>'+esc(x.n)+' · Ödeme planı</h3><p class="note">Tutarı değiştirince sonraki ayların bakiyesi ve yeni kart harcamaları anında hesaplanır. Her ayın kutusunu işaretleyerek o ayı takvime kaydedebilirsin. Asgari %20, aylık faiz %'+(+x.r||0)+'. Tahmini hesaplamadır.</p><button class="btn w" id="editCut">Hesap kesim günü: '+(closingDayAt(x,tdy())||'Belirle')+'</button><label>Her ay son ödeme günü</label><input id="dday" type="number" min="1" max="31" value="'+(+x.dueDay||6)+'"><button class="btn w" id="ddsave">Günü kaydet</button><div id="planRows" style="max-height:50vh;overflow:auto"></div><button class="btn p" id="planSave">✓ Seçili ayları kaydet ve takvime işle</button><p class="note">İşaretlenmeyen ayların mevcut kayıtları değiştirilmez. Seçili tarihte önceden kayıtlı ödeme varsa tutarı güncellenir; ikinci bir ödeme oluşturulmaz.</p>',()=>{
+ const payments=st.items.filter(i=>i.b===id&&kind(i)==='debt'&&i.a<0).sort((a,b)=>a.d.localeCompare(b.d));
+ const editable=payments.filter(i=>!i.paid&&(i.d>tdy()||isUnconfirmedPlan(i)));
+ const plannedIds=new Set(editable.map(i=>i.id));
+ const completed=payments.filter(i=>!plannedIds.has(i.id));
+ const occupied=new Set(payments.filter(i=>i.d>=tdy()||isUnconfirmedPlan(i)).map(i=>i.d.slice(0,7)));
+ const rows=debtSchedule(x).filter(z=>!occupied.has(z.date.slice(0,7)));
+ const savedList=editable.map(i=>`<button class="list-entry" data-saved="${att(i.id)}"><span><b>${fullDay(i.d)}</b><small>${isUnconfirmedPlan(i)?'Onay bekliyor':'Planlandı'} · Düzenle / kaldır</small>${paymentInfo(i)}</span><strong>${f(-i.a)} ₺</strong></button>`).join('');
+ const history=completed.map(i=>`<div class="row"><span>${fullDay(i.d)}</span><b>${f(-i.a)} ₺</b></div>`).join('');
+ sheet('<h3>'+esc(x.n)+' · Ödeme planı</h3><h4>Kayıtlı ödemeler ('+editable.length+')</h4>'+(savedList||'<p class="note">Kayıtlı ödeme planı yok.</p>')+(history?'<details><summary>Gerçekleşen ödemeler ('+completed.length+')</summary>'+history+'</details>':'')+'<details><summary>Yeni aylık ödemeler ekle</summary><p class="note">Tutarı değiştirince sonraki ayların bakiyesi ve yeni kart harcamaları anında hesaplanır. Her ayın kutusunu işaretleyerek o ayı takvime kaydedebilirsin. Asgari %20, aylık faiz %'+(+x.r||0)+'. Tahmini hesaplamadır.</p><button class="btn w" id="editCut">Hesap kesim günü: '+(closingDayAt(x,tdy())||'Belirle')+'</button><label>Her ay son ödeme günü</label><input id="dday" type="number" min="1" max="31" value="'+(+x.dueDay||6)+'"><button class="btn w" id="ddsave">Günü kaydet</button><p class="note">Kayıtlı bir ödemeyi taşımak için yukarıdaki tarihe dokun.</p><div id="planRows" style="max-height:50vh;overflow:auto"></div><button class="btn p" id="planSave">✓ Seçili ayları kaydet ve takvime işle</button><p class="note">İşaretlenmeyen ayların mevcut kayıtları değiştirilmez. Seçili tarihte önceden kayıtlı ödeme varsa tutarı güncellenir; ikinci bir ödeme oluşturulmaz.</p></details>',el=>{
+  el.querySelectorAll('[data-saved]').forEach(b=>b.onclick=()=>savedPaymentEditor(id,b.dataset.saved));
   const box=$('planRows'),choices={},selected={};
   const activeChoices=()=>Object.fromEntries(Object.keys(selected).filter(d=>selected[d]).map(d=>[d,choices[d]]));
   const money=n=>f(n);
